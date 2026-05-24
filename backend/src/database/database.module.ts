@@ -11,19 +11,29 @@ export const DATABASE_POOL = 'DATABASE_POOL';
       provide: DATABASE_POOL,
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
-        const pool = new Pool({
-          host: config.get('database.host'),
-          port: config.get('database.port'),
-          database: config.get('database.name'),
-          user: config.get('database.user'),
-          password: config.get('database.password'),
-          max: 20,
-          idleTimeoutMillis: 30_000,
-          connectionTimeoutMillis: 5_000,
-          ssl: config.get('nodeEnv') === 'production'
-            ? { rejectUnauthorized: false }
-            : false,
-        });
+        // Railway injects DATABASE_URL; fallback to individual vars for local dev
+        const databaseUrl = process.env.DATABASE_URL;
+        const isProd = config.get('nodeEnv') === 'production';
+
+        const pool = databaseUrl
+          ? new Pool({
+              connectionString: databaseUrl,
+              max: 20,
+              idleTimeoutMillis: 30_000,
+              connectionTimeoutMillis: 5_000,
+              ssl: isProd ? { rejectUnauthorized: false } : false,
+            })
+          : new Pool({
+              host: config.get('database.host'),
+              port: config.get('database.port'),
+              database: config.get('database.name'),
+              user: config.get('database.user'),
+              password: config.get('database.password'),
+              max: 20,
+              idleTimeoutMillis: 30_000,
+              connectionTimeoutMillis: 5_000,
+              ssl: isProd ? { rejectUnauthorized: false } : false,
+            });
 
         pool.on('error', (err) => {
           console.error('Unexpected error on idle DB client', err);

@@ -11,15 +11,23 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   private connected = false;
 
   constructor(private readonly config: ConfigService) {
-    this.redis = new Redis({
-      host: this.config.get<string>('redis.host', 'localhost'),
-      port: this.config.get<number>('redis.port', 6379),
-      password: this.config.get<string>('redis.password') || undefined,
-      lazyConnect: true,
-      enableOfflineQueue: false,
-      // Don't crash the app if Redis is unavailable
-      retryStrategy: (times) => (times > 3 ? null : Math.min(times * 200, 2000)),
-    });
+    // Railway injects REDIS_URL; fallback to individual vars for local dev
+    const redisUrl = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
+    this.redis = redisUrl
+      ? new Redis(redisUrl, {
+          lazyConnect: true,
+          enableOfflineQueue: false,
+          retryStrategy: (times) => (times > 3 ? null : Math.min(times * 200, 2000)),
+          tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+        })
+      : new Redis({
+          host: this.config.get<string>('redis.host', 'localhost'),
+          port: this.config.get<number>('redis.port', 6379),
+          password: this.config.get<string>('redis.password') || undefined,
+          lazyConnect: true,
+          enableOfflineQueue: false,
+          retryStrategy: (times) => (times > 3 ? null : Math.min(times * 200, 2000)),
+        });
 
     this.redis.on('error', (err) => {
       if (this.connected) {
