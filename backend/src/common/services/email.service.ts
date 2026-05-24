@@ -10,13 +10,25 @@ export class EmailService {
   private readonly appName = 'AI Commerce Ads Suite';
   private readonly appUrl: string;
 
+  private readonly enabled: boolean;
+
   constructor(private readonly config: ConfigService) {
-    this.resend = new Resend(config.get<string>('email.resendApiKey'));
+    const apiKey = config.get<string>('email.resendApiKey');
+    this.enabled = !!apiKey;
+    // Only instantiate Resend when a key is available — avoids crash on startup
+    this.resend = this.enabled ? new Resend(apiKey) : (null as unknown as Resend);
     this.from = config.get<string>('email.from', 'noreply@aicommerceads.com');
     this.appUrl = config.get<string>('frontendUrl', 'http://localhost:3001');
+    if (!this.enabled) {
+      this.logger.warn('⚠️  RESEND_API_KEY not set — email sending disabled (degraded mode)');
+    }
   }
 
   private async send(to: string, subject: string, html: string) {
+    if (!this.enabled) {
+      this.logger.warn(`Email skipped (no API key): ${subject} → ${to}`);
+      return;
+    }
     try {
       await this.resend.emails.send({ from: this.from, to, subject, html });
       this.logger.log(`📧 Email sent to ${to}: ${subject}`);
