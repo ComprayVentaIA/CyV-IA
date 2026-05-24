@@ -1,0 +1,80 @@
+# Entorno de desarrollo local
+# Uso: docker-compose up -d
+version: '3.9'
+
+services:
+  # ── Base de datos ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: cyv-postgres
+    environment:
+      POSTGRES_DB: ai_commerce_ads
+      POSTGRES_USER: aca_user
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aca_user -d ai_commerce_ads']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis (caché + rate limiting) ──────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cyv-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Backend NestJS ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyv-backend
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FRONTEND_URL: http://localhost:3001
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    command: npm run start:dev
+    restart: unless-stopped
+
+  # ── Frontend React (nginx) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cyv-frontend
+    ports:
+      - '3001:80'
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

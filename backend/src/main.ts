@@ -1,0 +1,78 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { WinstonModule } from 'nest-winston';
+import helmet from 'helmet';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { createWinstonLogger } from './common/logger/winston.config';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    // Required for Stripe webhook signature validation
+    rawBody: true,
+    // Winston replaces the default NestJS logger
+    logger: WinstonModule.createLogger(createWinstonLogger('bootstrap')),
+  });
+
+  const config = app.get(ConfigService);
+  const port = config.get<number>('port', 3000);
+  const env = config.get<string>('nodeEnv', 'development');
+
+  // ── Security ──────────────────────────────────────────────────────────────
+  app.use(helmet());
+  app.enableCors({
+    origin: config.get<string>('frontendUrl', 'http://localhost:3001'),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // ── Global prefix (exclude /health from prefix) ───────────────────────────
+  app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/live', 'health/ready'] });
+
+  // ── Pipes ─────────────────────────────────────────────────────────────────
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+
+  // ── Filters & Interceptors ────────────────────────────────────────────────
+  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new TransformInterceptor());
+
+  // ── Swagger (non-production only) ──────────────────────────────────────────
+  if (env !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('AI Commerce Ads Suite API')
+      .setDescription('API para la plataforma SaaS de automatización de Meta Ads')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('auth', 'Autenticación y sesiones')
+      .addTag('users', 'Gestión de usuarios')
+      .addTag('campaigns', 'Campañas publicitarias')
+      .addTag('creatives', 'Creativos generados por IA')
+      .addTag('meta-ads', 'Integración Meta Ads API')
+      .addTag('payments', 'Pagos y suscripciones Stripe')
+      .addTag('reports', 'Informes automáticos')
+      .addTag('ai', 'Servicios de inteligencia artificial')
+      .addTag('admin', 'Panel de administración')
+      .addTag('health', 'Estado del sistema')
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: { persistAuthorization: true },
+    });
+    console.log(`📚 Swagger docs → http://localhost:${port}/api/docs`);
+  }
+
+  await app.listen(port);
+  console.log(`🚀 API running on port ${port} [${env}]`);
+}
+
+bootstrap();

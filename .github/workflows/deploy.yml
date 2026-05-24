@@ -1,0 +1,121 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (default: sha corto del commit)'
+        required: false
+
+# Solo un deploy a la vez
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ── Build y push imágenes Docker a GHCR ───────────────────────────────────
+  build-and-push:
+    name: Build & Push Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate image metadata
+        id: meta
+        run: echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/cyv-backend:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ github.repository }}/cyv-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/cyv-frontend:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ github.repository }}/cyv-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Deploy al VPS vía SSH ─────────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/cyv-automatizada
+
+            # Actualizar IMAGE_TAG en el archivo de producción
+            export IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+            export GITHUB_REPO=${{ github.repository }}
+
+            echo "Desplegando imagen: $IMAGE_TAG"
+
+            # Login a GHCR desde el VPS
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull de las nuevas imágenes
+            docker-compose -f docker-compose.prod.yml pull backend frontend
+
+            # Restart con zero-downtime (primero backend, luego frontend)
+            docker-compose -f docker-compose.prod.yml up -d --no-deps --remove-orphans backend
+            sleep 10
+            docker-compose -f docker-compose.prod.yml up -d --no-deps --remove-orphans frontend
+
+            # Limpiar imágenes viejas
+            docker image prune -f
+
+            echo "Deploy completado: $IMAGE_TAG"
+
+      - name: Health check post-deploy
+        run: |
+          sleep 15
+          curl --fail --retry 5 --retry-delay 5 \
+            https://${{ secrets.VPS_HOST }}/api/v1/health/live \
+            && echo "Health check OK" \
+            || (echo "Health check FAILED" && exit 1)
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Deploy fallido — revisar logs en el VPS"
+          # Podés agregar acá un webhook a Slack, Discord o email

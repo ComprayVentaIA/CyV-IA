@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Build artifacts
+dist/
+*.js.map
+*.d.ts
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# TypeScript incremental compilation
+*.tsbuildinfo

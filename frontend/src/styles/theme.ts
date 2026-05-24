@@ -1,0 +1,26 @@
+export const C = {
+  bg: '#07070f',
+  surface: '#0f0f1a',
+  surface2: '#16162a',
+  border: '#1c1c2e',
+  borderBright: '#272740',
+  accent: '#7c5cfc',
+  accentHover: '#8f72ff',
+  accentDim: '#7c5cfc18',
+  green: '#00d68f',
+  greenDim: '#00d68f18',
+  red: '#ff4d6a',
+  redDim: '#ff4d6a18',
+  amber: '#ffb347',
+  amberDim: '#ffb34718',
+  blue: '#4da6ff',
+  blueDim: '#4da6ff18',
+  text: '#e8e8f4',
+  textMuted: '#666688',
+  textDim: '#333355',
+  grad: 'linear-gradient(135deg,#7c5cfc,#4da6ff)',
+  gradGreen: 'linear-gradient(135deg,#00d68f,#00b07a)',
+  gradRed: 'linear-gradient(135deg,#ff4d6a,#cc2244)',
+} as const;
+
+export type ThemeColor = keyof typeof C;
