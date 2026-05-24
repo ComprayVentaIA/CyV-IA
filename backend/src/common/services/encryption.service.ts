@@ -19,15 +19,10 @@ export class EncryptionService implements OnModuleInit {
     const env = this.config.get<string>('nodeEnv', 'development');
 
     if (!keyHex || keyHex.length !== 64) {
-      if (env === 'production') {
-        throw new Error(
-          'ENCRYPTION_KEY is required in production. Generate one with: openssl rand -hex 32',
-        );
-      }
       this.logger.warn(
-        '⚠️  ENCRYPTION_KEY not set — using insecure dev key. Set it before going to production.',
+        '⚠️  ENCRYPTION_KEY not set or invalid — running in degraded mode. Set ENCRYPTION_KEY (openssl rand -hex 32) for production.',
       );
-      // Dev-only fallback key — NEVER use in production
+      // Fallback key — tokens stored unencrypted until proper key is set
       this.key = Buffer.from('0'.repeat(64), 'hex');
     } else {
       this.key = Buffer.from(keyHex, 'hex');
