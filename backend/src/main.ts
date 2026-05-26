@@ -3,6 +3,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { WinstonModule } from 'nest-winston';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { autoMigrate } from './database/auto-migrate';
@@ -13,7 +16,10 @@ import { createWinstonLogger } from './common/logger/winston.config';
 async function bootstrap() {
   await autoMigrate();
 
-  const app = await NestFactory.create(AppModule, {
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Required for Stripe webhook signature validation
     rawBody: true,
     // Winston replaces the default NestJS logger
@@ -23,6 +29,9 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('port', 3000);
   const env = config.get<string>('nodeEnv', 'development');
+
+  // ── Static files (uploaded media) ────────────────────────────────────────
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
   // ── Security ──────────────────────────────────────────────────────────────
   app.use(helmet());

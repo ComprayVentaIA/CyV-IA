@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Spinner } from '../../components/ui';
+import FileUploadZone, { type UploadFile } from '../../components/ui/FileUploadZone';
+import { uploadsApi } from '../../api/uploads';
 import { C } from '../../styles/theme';
 
 const STEPS = ['Producto', 'IA analiza', 'Creativos', 'Publicar'];
@@ -9,7 +11,14 @@ export default function NewCampaign() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
   const [form, setForm] = useState({ name: '', price: '', desc: '', budget: '25' });
+  const [mainFiles, setMainFiles] = useState<UploadFile[]>([]);
+  const [extraFiles, setExtraFiles] = useState<UploadFile[]>([]);
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleUpload = useCallback(async (files: File[], onProgress: (pct: number) => void) => {
+    const res = await uploadsApi.upload(files, onProgress);
+    return (res.data as any)?.data?.files ?? res.data?.files ?? [];
+  }, []);
 
   const runAnalysis = () => {
     setAnalyzing(true);
@@ -37,26 +46,64 @@ export default function NewCampaign() {
           <div className="card">
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Datos del producto</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="fg"><label className="flbl">Nombre del producto</label><input className="finput" placeholder="ej. Nike Air Max 270" value={form.name} onChange={e => set('name', e.target.value)} /></div>
-              <div className="fg"><label className="flbl">Precio de venta</label><input className="finput" placeholder="$99.990" value={form.price} onChange={e => set('price', e.target.value)} /></div>
-              <div className="fg"><label className="flbl">Descripción</label><textarea className="ftxt" placeholder="¿Qué hace especial este producto?" value={form.desc} onChange={e => set('desc', e.target.value)} /></div>
+              <div className="fg">
+                <label className="flbl">Nombre del producto</label>
+                <input className="finput" placeholder="ej. Nike Air Max 270" value={form.name} onChange={e => set('name', e.target.value)} />
+              </div>
+              <div className="fg">
+                <label className="flbl">Precio de venta</label>
+                <input className="finput" placeholder="$99.990" value={form.price} onChange={e => set('price', e.target.value)} />
+              </div>
+              <div className="fg">
+                <label className="flbl">Descripción</label>
+                <textarea className="ftxt" placeholder="¿Qué hace especial este producto?" value={form.desc} onChange={e => set('desc', e.target.value)} />
+              </div>
               <div className="g2">
-                <div className="fg"><label className="flbl">Presupuesto (USD/día)</label><input className="finput" type="number" value={form.budget} onChange={e => set('budget', e.target.value)} /></div>
-                <div className="fg"><label className="flbl">Objetivo</label><select className="fsel"><option>→ WhatsApp</option><option>Tráfico web</option></select></div>
+                <div className="fg">
+                  <label className="flbl">Presupuesto (USD/día)</label>
+                  <input className="finput" type="number" value={form.budget} onChange={e => set('budget', e.target.value)} />
+                </div>
+                <div className="fg">
+                  <label className="flbl">Objetivo</label>
+                  <select className="fsel"><option>→ WhatsApp</option><option>Tráfico web</option></select>
+                </div>
               </div>
             </div>
           </div>
+
           <div className="card">
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Material</div>
-            <div className="upload" style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 24, marginBottom: 7 }}>🎬</div>
-              <div style={{ fontSize: 13, color: C.textMuted }}>Video o imagen principal</div>
-              <div style={{ fontSize: 11, color: C.textDim, marginTop: 3 }}>MP4, MOV, JPG · máx 500MB</div>
+
+            <div style={{ marginBottom: 13 }}>
+              <label className="flbl" style={{ marginBottom: 7, display: 'block' }}>Video o imagen principal</label>
+              <FileUploadZone
+                accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp"
+                multiple={false}
+                maxSizeMB={500}
+                icon="🎬"
+                label="Arrastrá o hacé click para subir"
+                hint="MP4, MOV, JPG, PNG · máx 500 MB"
+                value={mainFiles}
+                onChange={setMainFiles}
+                onUpload={handleUpload}
+              />
             </div>
-            <div className="upload">
-              <div style={{ fontSize: 24, marginBottom: 7 }}>🖼️</div>
-              <div style={{ fontSize: 13, color: C.textMuted }}>Fotos adicionales</div>
+
+            <div>
+              <label className="flbl" style={{ marginBottom: 7, display: 'block' }}>Fotos adicionales</label>
+              <FileUploadZone
+                accept="image/jpeg,image/png,image/webp"
+                multiple={true}
+                maxSizeMB={50}
+                icon="🖼️"
+                label="Arrastrá las fotos aquí"
+                hint="JPG, PNG, WebP · máx 50 MB por foto"
+                value={extraFiles}
+                onChange={setExtraFiles}
+                onUpload={handleUpload}
+              />
             </div>
+
             <div style={{ marginTop: 13, padding: '10px 12px', background: C.accentDim, borderRadius: 8, fontSize: 12, color: C.accent, lineHeight: 1.5 }}>
               💡 La IA crea versiones virales de tu material automáticamente
             </div>
@@ -70,8 +117,12 @@ export default function NewCampaign() {
             {!analyzed ? (
               <>
                 <div style={{ fontSize: 36, marginBottom: 13 }}>🤖</div>
-                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 7 }}>{analyzing ? 'IA analizando...' : 'Listo para analizar'}</div>
-                <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18, lineHeight: 1.6 }}>Voy a analizar Meta Ad Library, TikTok trends y patrones virales para crear la estrategia perfecta.</div>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 7 }}>
+                  {analyzing ? 'IA analizando...' : 'Listo para analizar'}
+                </div>
+                <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18, lineHeight: 1.6 }}>
+                  Voy a analizar Meta Ad Library, TikTok trends y patrones virales para crear la estrategia perfecta.
+                </div>
                 {analyzing ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', marginBottom: 18 }}>
                     {['Analizando Meta Ad Library...', 'Detectando hooks virales...', 'Generando copy estratégico...', 'Definiendo segmentación...'].map((t, i) => (
@@ -133,8 +184,18 @@ export default function NewCampaign() {
         <div className="g2" style={{ gap: 16 }}>
           <div className="card">
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Configuración final</div>
-            <div style={{ padding: '9px 12px', background: C.greenDim, borderRadius: 8, border: `1px solid ${C.green}33`, fontSize: 12, color: C.green, marginBottom: 13 }}>✅ Meta Ads conectado · WhatsApp vinculado</div>
-            {[['Campaña', form.name || 'Nueva campaña IA'], ['Presupuesto', `$${form.budget} USD/día`], ['Objetivo', 'Mensajes WhatsApp'], ['Formatos', 'Reel + Story + Feed'], ['Segmentación', 'IA: Mujeres 22-38'], ['Pixel Meta', 'Vinculado ✓']].map(([k, v], i) => (
+            <div style={{ padding: '9px 12px', background: C.greenDim, borderRadius: 8, border: `1px solid ${C.green}33`, fontSize: 12, color: C.green, marginBottom: 13 }}>
+              ✅ Meta Ads conectado · WhatsApp vinculado
+            </div>
+            {[
+              ['Campaña', form.name || 'Nueva campaña IA'],
+              ['Presupuesto', `$${form.budget} USD/día`],
+              ['Objetivo', 'Mensajes WhatsApp'],
+              ['Formatos', 'Reel + Story + Feed'],
+              ['Segmentación', 'IA: Mujeres 22-38'],
+              ['Pixel Meta', 'Vinculado ✓'],
+              ['Material subido', `${mainFiles.filter(f => f.status === 'done').length} archivo(s) principal + ${extraFiles.filter(f => f.status === 'done').length} adicional(es)`],
+            ].map(([k, v], i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: `1px solid ${C.border}22` }}>
                 <span style={{ color: C.textMuted }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span>
               </div>

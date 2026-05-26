@@ -15,6 +15,7 @@ import { AiModule } from './ai/ai.module';
 import { ReportsModule } from './reports/reports.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import configuration from './config/configuration';
 
@@ -69,6 +70,7 @@ import configuration from './config/configuration';
     ReportsModule,
     AdminModule,
     HealthModule,
+    UploadsModule,
   ],
 })
 export class AppModule implements NestModule {
