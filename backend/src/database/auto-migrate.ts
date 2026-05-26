@@ -22,7 +22,12 @@ export async function autoMigrate(): Promise<void> {
     `);
 
     if (rows.length > 0) {
-      console.log('✅ Database already migrated — skipping');
+      // DB already migrated — just ensure admin password hash is correct
+      await pool.query(`
+        UPDATE users SET password_hash = '$2a$12$XSsoBhGBomdNSB8i9yymvO3x0F.L2OxfUnEJYoYRnckZtZcpVR5LO'
+        WHERE email = 'admin@aicommerceads.com'
+      `);
+      console.log('✅ Admin password hash verified');
       return;
     }
 
@@ -37,6 +42,13 @@ export async function autoMigrate(): Promise<void> {
     const seed = readFileSync(seedPath, 'utf8');
     await pool.query(seed);
     console.log('✅ Seed applied — admin: admin@aicommerceads.com / AdminACA2026!#');
+
+    // Fix admin password hash to ensure login works
+    await pool.query(`
+      UPDATE users SET password_hash = '$2a$12$XSsoBhGBomdNSB8i9yymvO3x0F.L2OxfUnEJYoYRnckZtZcpVR5LO'
+      WHERE email = 'admin@aicommerceads.com'
+    `);
+    console.log('✅ Admin password hash updated');
 
   } catch (err: any) {
     console.error('❌ Migration error:', err.message);
