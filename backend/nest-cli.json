@@ -4,6 +4,9 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "webpack": false
+    "webpack": false,
+    "assets": [
+      { "include": "../database/*.sql", "outDir": "./dist/database", "watchAssets": true }
+    ]
   }
 }

@@ -5,11 +5,14 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { WinstonModule } from 'nest-winston';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { autoMigrate } from './database/auto-migrate';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { createWinstonLogger } from './common/logger/winston.config';
 
 async function bootstrap() {
+  await autoMigrate();
+
   const app = await NestFactory.create(AppModule, {
     // Required for Stripe webhook signature validation
     rawBody: true,
