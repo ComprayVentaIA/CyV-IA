@@ -197,7 +197,7 @@ export default function LandingPage() {
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m}</div>
                   </div>
-                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'DM Mono',monospace', flexShrink: 0" }}>{t}</div>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>{t}</div>
                 </div>
               ))}
             </div>
