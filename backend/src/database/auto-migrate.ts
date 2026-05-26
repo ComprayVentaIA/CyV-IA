@@ -2,6 +2,40 @@ import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+async function ensureNewTables(pool: Pool): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_patterns (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      source VARCHAR(100) DEFAULT 'Manual',
+      type VARCHAR(20) DEFAULT 'video',
+      hook TEXT NOT NULL,
+      style TEXT,
+      platform VARCHAR(50) DEFAULT 'reels',
+      tone VARCHAR(100),
+      visual_notes TEXT,
+      cta TEXT,
+      audience VARCHAR(200),
+      score INTEGER DEFAULT 80,
+      active BOOLEAN DEFAULT true,
+      uses INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS user_integrations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type VARCHAR(50) NOT NULL,
+      config JSONB NOT NULL DEFAULT '{}',
+      status VARCHAR(20) DEFAULT 'connected',
+      connected_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, type)
+    );
+  `);
+}
+
 export async function autoMigrate(): Promise<void> {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -22,11 +56,12 @@ export async function autoMigrate(): Promise<void> {
     `);
 
     if (rows.length > 0) {
-      // DB already migrated — just ensure admin password hash is correct
+      // DB already migrated — patch admin hash + ensure new tables exist
       await pool.query(`
         UPDATE users SET password_hash = '$2a$12$XSsoBhGBomdNSB8i9yymvO3x0F.L2OxfUnEJYoYRnckZtZcpVR5LO'
         WHERE email = 'admin@aicommerceads.com'
       `);
+      await ensureNewTables(pool);
       console.log('✅ Admin password hash verified');
       return;
     }
@@ -49,6 +84,9 @@ export async function autoMigrate(): Promise<void> {
       WHERE email = 'admin@aicommerceads.com'
     `);
     console.log('✅ Admin password hash updated');
+
+    await ensureNewTables(pool);
+    console.log('✅ Extended tables created');
 
   } catch (err: any) {
     console.error('❌ Migration error:', err.message);

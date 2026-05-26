@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { path: '/dashboard/campaigns', label: 'Campañas', icon: '📣' },
   { path: '/dashboard/new-campaign', label: 'Nueva campaña', icon: '✨' },
   { path: '/dashboard/creatives', label: 'Creativos IA', icon: '🎨' },
+  { path: '/dashboard/conversia-ia', label: 'Conversia IA', icon: '🧠', highlight: true },
   { path: '/dashboard/reports', label: 'Reportes', icon: '📈' },
   { path: '/dashboard/integrations', label: 'Integraciones', icon: '🔗' },
   { path: '/dashboard/billing', label: 'Facturación', icon: '💳' },
@@ -18,7 +19,7 @@ const BOTTOM_NAV = [
   { path: '/dashboard/campaigns', label: 'Campañas', icon: '📣' },
   { path: '/dashboard/new-campaign', label: 'Crear', icon: '✨' },
   { path: '/dashboard/creatives', label: 'Creativos', icon: '🎨' },
-  { path: '/dashboard/reports', label: 'Reportes', icon: '📈' },
+  { path: '/dashboard/conversia-ia', label: 'IA', icon: '🧠' },
 ];
 
 export default function DashShell() {
@@ -33,7 +34,7 @@ export default function DashShell() {
   const navTo = (path: string) => { navigate(path); setMobOpen(false); };
 
   const pageTitle = NAV_ITEMS.find(n =>
-    n.end ? location.pathname === n.path : location.pathname.startsWith(n.path)
+    (n as any).end ? location.pathname === n.path : location.pathname.startsWith(n.path)
   )?.label ?? 'Dashboard';
 
   return (
@@ -51,13 +52,19 @@ export default function DashShell() {
         </div>
         <nav className="nav">
           <div className="nav-lbl">Principal</div>
-          {NAV_ITEMS.slice(0, 6).map(n => (
-            <button key={n.path} className={`nav-btn${isActive(n.path, n.end) ? ' active' : ''}`} onClick={() => navTo(n.path)}>
+          {NAV_ITEMS.slice(0, 7).map(n => (
+            <button
+              key={n.path}
+              className={`nav-btn${isActive(n.path, n.end) ? ' active' : ''}`}
+              onClick={() => navTo(n.path)}
+              style={(n as any).highlight && !isActive(n.path) ? { background: 'linear-gradient(135deg,#7c5cfc14,#4da6ff14)', border: '1px solid #7c5cfc33', color: '#9d80ff' } : {}}
+            >
               <span className="nav-icon">{n.icon}</span>{n.label}
+              {(n as any).highlight && <span style={{ marginLeft: 'auto', fontSize: 8, background: 'linear-gradient(135deg,#7c5cfc,#4da6ff)', color: '#fff', padding: '1px 5px', borderRadius: 4, fontFamily: "'DM Mono',monospace" }}>IA</span>}
             </button>
           ))}
           <div className="nav-lbl" style={{ marginTop: 6 }}>Cuenta</div>
-          {NAV_ITEMS.slice(6).map(n => (
+          {NAV_ITEMS.slice(7).map(n => (
             <button key={n.path} className={`nav-btn${isActive(n.path) ? ' active' : ''}`} onClick={() => navTo(n.path)}>
               <span className="nav-icon">{n.icon}</span>{n.label}
             </button>
