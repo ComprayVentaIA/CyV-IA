@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Plan } from '../types';
 
@@ -43,7 +43,7 @@ function useInView(threshold = 0.15) {
   return { ref, v };
 }
 
-function Fade({ children, delay = 0, y = 24 }: { children: React.ReactNode; delay?: number; y?: number }) {
+function Fade({ children, delay = 0, y = 24 }: { children: ReactNode; delay?: number; y?: number }) {
   const { ref, v } = useInView();
   return (
     <div ref={ref} style={{ opacity: v ? 1 : 0, transform: v ? 'none' : `translateY(${y}px)`, transition: `opacity .65s ease ${delay}ms, transform .65s ease ${delay}ms` }}>
