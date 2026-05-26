@@ -43,8 +43,8 @@ export default function DashShell() {
         <div className="logo-wrap">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="logo">
-              <div className="logo-icon">AI</div>
-              <div className="logo-txt">Commerce Ads<div className="logo-sub">Suite · v1.0</div></div>
+              <div className="logo-icon" style={{ fontSize: 14, fontWeight: 800 }}>C</div>
+              <div className="logo-txt">CONVERSIA<div className="logo-sub">ADS SUITE</div></div>
             </div>
             <button style={{ display: 'none', background: 'none', border: 'none', color: C.textMuted, fontSize: 18, cursor: 'pointer', padding: 4 }} className="mob-close-btn" onClick={() => setMobOpen(false)}>✕</button>
           </div>
