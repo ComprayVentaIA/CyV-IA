@@ -17,13 +17,22 @@ const MAX_FIELD_LENGTH = 500;
 
 @Injectable()
 export class AiService {
-  private readonly anthropic: Anthropic;
+  private readonly anthropic: Anthropic | null = null;
   private readonly logger = new Logger(AiService.name);
 
   constructor(private readonly config: ConfigService) {
-    this.anthropic = new Anthropic({
-      apiKey: this.config.get<string>('anthropic.apiKey'),
-    });
+    const apiKey = this.config.get<string>('anthropic.apiKey') || process.env.ANTHROPIC_API_KEY;
+    if (apiKey) {
+      this.anthropic = new Anthropic({ apiKey });
+      this.logger.log('🤖 AiService initialized');
+    } else {
+      this.logger.warn('⚠️  ANTHROPIC_API_KEY not set — AI features disabled (degraded mode)');
+    }
+  }
+
+  private get client(): Anthropic {
+    if (!this.anthropic) throw new Error('IA no disponible — configurá ANTHROPIC_API_KEY en las variables de entorno');
+    return this.anthropic;
   }
 
   // Sanitizes user input before interpolation into AI prompts
@@ -88,7 +97,7 @@ Generá una estrategia completa en JSON con esta estructura exacta:
 
 Respondé SOLO con el JSON válido, sin texto adicional.`;
 
-    const response = await this.anthropic.messages.create({
+    const response = await this.client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
@@ -124,7 +133,7 @@ Generá un array JSON de insights con esta estructura:
 
 Máximo 6 insights. Ordenalos por prioridad. SOLO JSON, sin texto adicional.`;
 
-    const response = await this.anthropic.messages.create({
+    const response = await this.client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
@@ -163,7 +172,7 @@ Generá sugerencias en JSON:
 
 SOLO JSON.`;
 
-    const response = await this.anthropic.messages.create({
+    const response = await this.client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }],
@@ -184,7 +193,7 @@ SOLO JSON.`;
     const safeStyle = this.sanitize(style, 100);
     const safeFormat = this.sanitize(format, 10);
 
-    const response = await this.anthropic.messages.create({
+    const response = await this.client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       messages: [{
@@ -211,6 +220,48 @@ Respondé SOLO con el script, sin etiquetas ni explicaciones.`,
     return { text };
   }
 
+  // ── Analyze content and extract pattern fields ────────────────────────────
+
+  async analyzePattern(content: string, sourceUrl?: string): Promise<{
+    hook?: string; style?: string; platform?: string; tone?: string;
+    visualNotes?: string; cta?: string; audience?: string; score?: number; source?: string; type?: string;
+  }> {
+    const safeContent = this.sanitize(content, 800);
+
+    const response = await this.client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `Analizá este contenido publicitario y extraé los campos clave en JSON.
+
+Contenido: ${safeContent}
+${sourceUrl ? `URL fuente: ${sourceUrl}` : ''}
+
+Respondé SOLO con este JSON válido:
+{
+  "hook": "el gancho principal extraído (máx 80 chars)",
+  "style": "estilo visual detectado o null",
+  "platform": "reels|stories|feed|tiktok|youtube",
+  "tone": "tono detectado (urgencia, humor, emocional, etc) o null",
+  "visualNotes": "notas sobre el video/imagen si hay o null",
+  "cta": "llamada a la acción detectada o null",
+  "audience": "audiencia objetivo estimada o null",
+  "score": número entre 60 y 95 basado en calidad del hook,
+  "type": "video|image|carousel"
+}`,
+      }],
+    });
+
+    const raw = (response.content[0] as any).text;
+    try {
+      return JSON.parse(raw.replace(/```json|```/g, '').trim());
+    } catch {
+      const firstLine = safeContent.split(/[.!\n]/)[0]?.slice(0, 80) ?? 'Hook extraído';
+      return { hook: firstLine, score: 75, platform: 'reels', type: 'video' };
+    }
+  }
+
   // ── Generate creative prompt ──────────────────────────────────────────────
 
   async generateCreativePrompt(product: string, style: string, format: string) {
@@ -218,7 +269,7 @@ Respondé SOLO con el script, sin etiquetas ni explicaciones.`,
     const safeStyle = this.sanitize(style, 100);
     const safeFormat = this.sanitize(format, 10);
 
-    const response = await this.anthropic.messages.create({
+    const response = await this.client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
       messages: [{

@@ -110,33 +110,9 @@ export class AiTrainingService {
 
   async analyzeAndExtract(content: string, sourceUrl?: string): Promise<Partial<CreatePatternDto>> {
     const safeContent = content.slice(0, 800);
-    const response = await (this.aiService as any).anthropic?.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{
-        role: 'user',
-        content: `Analizá este contenido publicitario y extraé el patrón viral.
-
-Contenido: "${safeContent}"
-${sourceUrl ? `Fuente: ${sourceUrl}` : ''}
-
-Respondé SOLO con JSON:
-{
-  "hook": "el gancho principal (máx 10 palabras)",
-  "style": "descripción del estilo visual y edición",
-  "tone": "tono emocional (urgencia/inspiración/humor/etc)",
-  "cta": "llamada a la acción detectada",
-  "audience": "audiencia ideal detectada",
-  "platform": "reels|stories|feed",
-  "score": número entre 60 y 98,
-  "type": "video|image"
-}`,
-      }],
-    });
-
     try {
-      const text = (response?.content[0] as any)?.text ?? '{}';
-      return JSON.parse(text.replace(/```json|```/g, '').trim());
+      const result = await this.aiService.analyzePattern(safeContent, sourceUrl);
+      return result;
     } catch {
       return { hook: safeContent.split(/[.!\n]/)[0]?.slice(0, 60) ?? 'Hook extraído', score: 75 };
     }

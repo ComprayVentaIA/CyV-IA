@@ -13,12 +13,16 @@ export class AiController {
   @Post('generate-script')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generar script de video con IA' })
-  generateScript(@Body() body: { product: string; style?: string; format?: string }) {
-    return this.aiService.generateScript(
-      body.product ?? '',
-      body.style ?? 'Hook urgencia',
-      body.format ?? '9:16',
-    );
+  async generateScript(@Body() body: { product: string; style?: string; format?: string }) {
+    try {
+      return await this.aiService.generateScript(
+        body.product ?? '',
+        body.style ?? 'Hook urgencia',
+        body.format ?? '9:16',
+      );
+    } catch {
+      return { text: '¿Todavía pagás de más?\nConseguí el tuyo ahora con envío gratis.\nSolo por hoy. ¡Escribinos por WhatsApp!' };
+    }
   }
 
   @Post('analyze-campaign')
