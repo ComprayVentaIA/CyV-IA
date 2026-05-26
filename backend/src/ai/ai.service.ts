@@ -177,6 +177,40 @@ SOLO JSON.`;
     }
   }
 
+  // ── Generate video script for creatives ──────────────────────────────────
+
+  async generateScript(product: string, style: string, format: string): Promise<{ text: string }> {
+    const safeProduct = this.sanitize(product, 150);
+    const safeStyle = this.sanitize(style, 100);
+    const safeFormat = this.sanitize(format, 10);
+
+    const response = await this.anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `Sos un experto en publicidad viral de Meta Ads para el mercado latinoamericano.
+Generá un script corto para un video publicitario de ${safeFormat}.
+
+Producto: ${safeProduct}
+Estilo: ${safeStyle}
+Formato: ${safeFormat}
+
+El script debe:
+- Empezar con un hook poderoso (primera línea = gancho viral de máx 8 palabras)
+- Durar 15-30 segundos cuando se lee en voz alta
+- Tener urgencia y beneficio claro
+- Terminar con CTA para WhatsApp
+- Estar en español rioplatense
+
+Respondé SOLO con el script, sin etiquetas ni explicaciones.`,
+      }],
+    });
+
+    const text = (response.content[0] as any).text.trim();
+    return { text };
+  }
+
   // ── Generate creative prompt ──────────────────────────────────────────────
 
   async generateCreativePrompt(product: string, style: string, format: string) {
