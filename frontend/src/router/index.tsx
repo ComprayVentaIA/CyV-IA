@@ -20,6 +20,7 @@ const Reports         = lazy(() => import('../pages/dashboard/Reports'));
 const Integrations    = lazy(() => import('../pages/dashboard/Integrations'));
 const Billing         = lazy(() => import('../pages/dashboard/Billing'));
 const ConversiaIA     = lazy(() => import('../pages/dashboard/ConversiaIA'));
+const Profile         = lazy(() => import('../pages/dashboard/Profile'));
 
 const AdminShell      = lazy(() => import('../pages/admin/AdminShell'));
 const AdminOverview   = lazy(() => import('../pages/admin/AdminOverview'));
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
       { path: 'reports',                element: <S><Reports /></S> },
       { path: 'integrations',           element: <S><Integrations /></S> },
       { path: 'billing',                element: <S><Billing /></S> },
+      { path: 'profile',               element: <S><Profile /></S> },
     ],
   },
 

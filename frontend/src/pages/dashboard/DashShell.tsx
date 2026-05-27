@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { C } from '../../styles/theme';
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { path: '/dashboard/reports', label: 'Reportes', icon: '📈' },
   { path: '/dashboard/integrations', label: 'Integraciones', icon: '🔗' },
   { path: '/dashboard/billing', label: 'Facturación', icon: '💳' },
+  { path: '/dashboard/profile', label: 'Mi perfil', icon: '👤' },
 ];
 
 const BOTTOM_NAV = [
@@ -27,6 +28,18 @@ export default function DashShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobOpen, setMobOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const avatarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const isActive = (path: string, end = false) =>
     end ? location.pathname === path : location.pathname.startsWith(path);
@@ -94,8 +107,41 @@ export default function DashShell() {
           <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 15, flex: 1 }} className="topbar-title-txt">{pageTitle}</div>
           <div style={{ fontSize: 12, color: C.textMuted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 12px' }} className="topbar-search-wrap">🔍 Buscar…</div>
           <button className="btn btn-g" style={{ fontSize: 12, padding: '6px 10px' }}>🔔</button>
-          <div style={{ width: 28, height: 28, borderRadius: '50%', background: C.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-            {user?.fullName?.[0] ?? 'A'}
+          <div ref={avatarRef} style={{ position: 'relative' }}>
+            <div
+              onClick={() => setAvatarOpen(v => !v)}
+              style={{ width: 28, height: 28, borderRadius: '50%', background: C.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0, border: avatarOpen ? `2px solid ${C.accent}` : '2px solid transparent', transition: 'border-color .15s' }}
+            >
+              {user?.fullName?.[0]?.toUpperCase() ?? 'U'}
+            </div>
+            {avatarOpen && (
+              <div style={{ position: 'absolute', top: 36, right: 0, background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 6, minWidth: 190, zIndex: 200, boxShadow: '0 12px 40px #00000066' }} className="scale-in">
+                <div style={{ padding: '8px 12px', borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.fullName ?? 'Usuario'}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email ?? ''}</div>
+                </div>
+                {[
+                  { icon: '👤', label: 'Mi perfil', path: '/dashboard/profile' },
+                  { icon: '💳', label: 'Facturación', path: '/dashboard/billing' },
+                  { icon: '🔗', label: 'Integraciones', path: '/dashboard/integrations' },
+                ].map(item => (
+                  <button key={item.path} onClick={() => { navTo(item.path); setAvatarOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none', background: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 13, textAlign: 'left', transition: 'all .12s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = C.bg; (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = C.textMuted; }}>
+                    <span style={{ fontSize: 14 }}>{item.icon}</span>{item.label}
+                  </button>
+                ))}
+                <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 4, paddingTop: 4 }}>
+                  <button onClick={() => { logout(); setAvatarOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none', background: 'none', color: C.red, cursor: 'pointer', fontSize: 13, textAlign: 'left', transition: 'all .12s' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = C.redDim}
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
+                    <span style={{ fontSize: 14 }}>🚪</span>Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <button className="btn btn-p" style={{ fontSize: 12, whiteSpace: 'nowrap' }} onClick={() => navTo('/dashboard/new-campaign')}>+ Campaña</button>
         </div>

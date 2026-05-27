@@ -32,7 +32,7 @@ h1{color:#7c5cfc;font-size:22px;margin:0 0 4px}.sub{color:#888;font-size:13px}
 .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
 .total{font-weight:700;font-size:16px;color:#7c5cfc;border-top:2px solid #7c5cfc;margin-top:8px}
 .badge{display:inline-block;background:#e0fff2;color:#00b877;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600}</style></head>
-<body><div class="header"><h1>AI Commerce Ads Suite</h1><div class="sub">Factura / Recibo de pago</div></div>
+<body><div class="header"><h1>CONVERSIA ADS</h1><div class="sub">Factura / Recibo de pago</div></div>
 <div class="row"><span>Número de factura</span><strong>${inv.id}</strong></div>
 <div class="row"><span>Fecha de emisión</span><span>${inv.date}</span></div>
 <div class="row"><span>Período</span><span>${inv.period}</span></div>
@@ -40,7 +40,7 @@ h1{color:#7c5cfc;font-size:22px;margin:0 0 4px}.sub{color:#888;font-size:13px}
 <div class="row"><span>Plan</span><span>${plan.charAt(0).toUpperCase() + plan.slice(1)}</span></div>
 <div class="row"><span>Estado</span><span><span class="badge">${inv.status}</span></span></div>
 <div class="row total"><span>Total</span><span>$${inv.amount} USD</span></div>
-<p style="font-size:12px;color:#aaa;margin-top:24px">Gracias por usar AI Commerce Ads Suite</p>
+<p style="font-size:12px;color:#aaa;margin-top:24px">Gracias por usar CONVERSIA ADS</p>
 </body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);

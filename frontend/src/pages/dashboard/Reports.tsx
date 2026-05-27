@@ -34,7 +34,7 @@ th{text-align:left;padding:8px 10px;background:#f8f8ff;color:#666;font-size:10px
 td{padding:9px 10px;border-bottom:1px solid #f0f0f8}
 .footer{text-align:center;font-size:11px;color:#aaa;border-top:1px solid #f0f0f8;padding-top:18px;margin-top:28px}
 </style></head><body>
-<div class="header"><h1>📊 Informe Diario — AI Commerce Ads Suite</h1><p>Generado el ${date} a las 20:00 hs</p></div>
+<div class="header"><h1>📊 Informe Diario — CONVERSIA ADS</h1><p>Generado el ${date} a las 20:00 hs</p></div>
 <div class="kpis">
   <div class="kpi"><div class="kpi-lbl">ROAS Promedio</div><div class="kpi-val green">3.8x</div></div>
   <div class="kpi"><div class="kpi-lbl">Leads WhatsApp</div><div class="kpi-val purple">342</div></div>
@@ -43,7 +43,7 @@ td{padding:9px 10px;border-bottom:1px solid #f0f0f8}
 </div>
 <h2>📣 Detalle de campañas</h2>
 <table><thead><tr><th>Campaña</th><th>ROAS</th><th>CTR</th><th>Gasto</th><th>Leads</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="footer">AI Commerce Ads Suite · Informe automático · ${date}</div>
+<div class="footer">CONVERSIA ADS · Informe automático · ${date}</div>
 </body></html>`;
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);

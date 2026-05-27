@@ -64,10 +64,10 @@ export default function AuthPage() {
       <button className="btn btn-g" style={{ position: 'fixed', top: 20, left: 20, fontSize: 12 }} onClick={() => navigate('/')}>← Volver</button>
       <div className="auth-card fade-in">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 26 }}>
-          <div className="logo-icon" style={{ width: 34, height: 34, fontSize: 14 }}>AI</div>
+          <div className="logo-icon" style={{ width: 34, height: 34, fontSize: 14 }}>C</div>
           <div>
-            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>AI Commerce Ads</div>
-            <div style={{ fontSize: 11, color: C.textMuted }}>Suite</div>
+            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14, letterSpacing: '.01em' }}>CONVERSIA</div>
+            <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "'DM Mono',monospace", letterSpacing: '.1em' }}>ADS SUITE</div>
           </div>
         </div>
         {plan && (

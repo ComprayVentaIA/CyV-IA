@@ -42,8 +42,11 @@ export default function CheckoutPage() {
       <div className="co-card fade-in">
         <div className="co-left">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-            <div className="logo-icon" style={{ width: 26, height: 26, fontSize: 11 }}>AI</div>
-            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14 }}>AI Commerce Ads Suite</div>
+            <div className="logo-icon" style={{ width: 26, height: 26, fontSize: 11 }}>C</div>
+            <div>
+              <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 13, letterSpacing: '.01em' }}>CONVERSIA</div>
+              <div style={{ fontSize: 8, color: C.textMuted, fontFamily: "'DM Mono',monospace", letterSpacing: '.1em' }}>ADS SUITE</div>
+            </div>
           </div>
           <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 19, marginBottom: 18 }}>Resumen del pedido</div>
           <div className="co-summary">

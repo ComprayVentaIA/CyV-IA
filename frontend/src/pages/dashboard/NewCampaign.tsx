@@ -17,7 +17,7 @@ export default function NewCampaign() {
 
   const handleUpload = useCallback(async (files: File[], onProgress: (pct: number) => void) => {
     const res = await uploadsApi.upload(files, onProgress);
-    return (res.data as any)?.data?.files ?? res.data?.files ?? [];
+    return (res.data as any)?.data?.files ?? [];
   }, []);
 
   const runAnalysis = () => {

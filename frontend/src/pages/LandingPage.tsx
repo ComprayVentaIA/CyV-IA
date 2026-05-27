@@ -54,12 +54,6 @@ function Fade({ children, delay = 0, y = 24 }: { children: ReactNode; delay?: nu
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => (t + 1) % TICKER.length), 2800);
-    return () => clearInterval(id);
-  }, []);
 
   const toRegister = () => navigate('/auth', { state: { tab: 'register' } });
   const toLogin = () => navigate('/auth', { state: { tab: 'login' } });
