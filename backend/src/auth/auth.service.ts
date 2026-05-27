@@ -113,9 +113,6 @@ export class AuthService {
   // ── Login ─────────────────────────────────────────────────────────────────
 
   async login(user: any) {
-    if (!user.email_verified) {
-      throw new UnauthorizedException('Verificá tu email antes de ingresar');
-    }
     if (user.status === 'suspended') {
       throw new UnauthorizedException('Tu cuenta está suspendida. Contactá soporte.');
     }
