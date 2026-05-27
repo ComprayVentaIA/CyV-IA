@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Spinner } from '../../components/ui';
 import FileUploadZone, { type UploadFile } from '../../components/ui/FileUploadZone';
 import { uploadsApi } from '../../api/uploads';
@@ -14,6 +14,11 @@ const CREATIVE_CONFIGS = [
   { fmt: '4:5' as const, label: 'Story', from: '#281a05', to: '#6b4f0f', emoji: '📱', best: false },
 ];
 
+const ZONES_AR = [
+  'Todo Argentina', 'AMBA (Buenos Aires + GBA)', 'CABA', 'GBA Norte', 'GBA Sur', 'GBA Oeste',
+  'Córdoba', 'Rosario', 'Mendoza', 'Tucumán', 'Salta', 'Mar del Plata',
+];
+
 interface AiStrategy {
   hook: string;
   headline?: string;
@@ -27,21 +32,61 @@ interface AiStrategy {
   reasoning?: string;
 }
 
+type Currency = 'USD' | 'ARS';
+type Gender = 'Todos' | 'Masculino' | 'Femenino';
+
 export default function NewCampaign() {
   const [step, setStep] = useState(1);
   const [analyzing, setAnalyzing] = useState(false);
   const [strategy, setStrategy] = useState<AiStrategy | null>(null);
   const [analyzeError, setAnalyzeError] = useState('');
+
+  // Step 1 form
   const [form, setForm] = useState({ name: '', price: '', desc: '', budget: '25', objective: '→ WhatsApp' });
+  const [currency, setCurrency] = useState<Currency>('USD');
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  // Step 3: audience & zone config
+  const [gender, setGender] = useState<Gender>('Todos');
+  const [ageMin, setAgeMin] = useState(18);
+  const [ageMax, setAgeMax] = useState(55);
+  const [zone, setZone] = useState('Todo Argentina');
+  const [interests, setInterests] = useState('');
+
+  // File uploads
   const [mainFiles, setMainFiles] = useState<UploadFile[]>([]);
   const [extraFiles, setExtraFiles] = useState<UploadFile[]>([]);
+
+  // Canvas-generated creatives
   const [creativeImages, setCreativeImages] = useState<string[]>([]);
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   const handleUpload = useCallback(async (files: File[], onProgress: (pct: number) => void) => {
     const res = await uploadsApi.upload(files, onProgress);
     return (res.data as any)?.data?.files ?? [];
   }, []);
+
+  // Generate canvas images whenever we enter step 3 and have a strategy
+  useEffect(() => {
+    if (step !== 3 || !strategy) return;
+    try {
+      const hook = strategy.hook || form.name || 'Oferta especial';
+      const product = form.name || 'Producto';
+      const images = CREATIVE_CONFIGS.map(cfg =>
+        generateCreativeImage({
+          hook,
+          product,
+          format: cfg.fmt,
+          style: strategy.styleNotes ?? 'Hook urgencia',
+          avatarEmoji: cfg.emoji,
+          gradientFrom: cfg.from,
+          gradientTo: cfg.to,
+        })
+      );
+      setCreativeImages(images);
+    } catch {
+      setCreativeImages([]);
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runAnalysis = async () => {
     if (!form.name.trim() && !form.desc.trim()) return;
@@ -57,7 +102,6 @@ export default function NewCampaign() {
       const data = (res.data as any)?.data ?? res.data;
       setStrategy(data);
     } catch {
-      // fallback strategy
       setStrategy({
         hook: '¿Todavía pagás de más?',
         headline: form.name || 'Oferta especial',
@@ -74,20 +118,25 @@ export default function NewCampaign() {
 
   const goToCreatives = () => {
     if (!strategy) return;
-    const hook = strategy.hook || form.name || 'Oferta especial';
-    const product = form.name || 'Producto';
-    const images = CREATIVE_CONFIGS.map(cfg =>
-      generateCreativeImage({
-        hook,
-        product,
-        format: cfg.fmt,
-        style: strategy.styleNotes ?? 'Hook urgencia',
-        avatarEmoji: cfg.emoji,
-        gradientFrom: cfg.from,
-        gradientTo: cfg.to,
-      })
-    );
-    setCreativeImages(images);
+    // Explicitly generate images (also covered by useEffect but this is faster)
+    try {
+      const hook = strategy.hook || form.name || 'Oferta especial';
+      const product = form.name || 'Producto';
+      const images = CREATIVE_CONFIGS.map(cfg =>
+        generateCreativeImage({
+          hook,
+          product,
+          format: cfg.fmt,
+          style: strategy.styleNotes ?? 'Hook urgencia',
+          avatarEmoji: cfg.emoji,
+          gradientFrom: cfg.from,
+          gradientTo: cfg.to,
+        })
+      );
+      setCreativeImages(images);
+    } catch {
+      setCreativeImages([]);
+    }
     setStep(3);
   };
 
@@ -95,8 +144,13 @@ export default function NewCampaign() {
     hook: '—', audience: { description: '—' }, format: '9_16', cta: '—', styleNotes: '—',
   };
 
+  const btnStyle = (active: boolean) => ({
+    padding: '5px 13px', borderRadius: 6, fontSize: 11, border: `1px solid ${active ? C.accent : C.border}`,
+    background: active ? C.accentDim : 'transparent', color: active ? C.accent : C.textMuted, cursor: 'pointer' as const,
+  });
+
   return (
-    <div className="content fade-in">
+    <div className="content fade-in" translate="no">
       <div className="steps-row" style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
         {STEPS.map((s, i) => (
           <div key={i} className="step-item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -111,7 +165,7 @@ export default function NewCampaign() {
         ))}
       </div>
 
-      {/* Step 1: Product data */}
+      {/* ── Step 1: Product data ─────────────────────────────────────────────── */}
       {step === 1 && (
         <div className="g2" style={{ gap: 16 }}>
           <div className="card">
@@ -123,7 +177,7 @@ export default function NewCampaign() {
               </div>
               <div className="fg">
                 <label className="flbl">Precio de venta</label>
-                <input className="finput" placeholder="$99.990" value={form.price} onChange={e => set('price', e.target.value)} />
+                <input className="finput" placeholder={currency === 'USD' ? '$99.00' : '$89.990'} value={form.price} onChange={e => set('price', e.target.value)} />
               </div>
               <div className="fg">
                 <label className="flbl">Descripción</label>
@@ -131,8 +185,29 @@ export default function NewCampaign() {
               </div>
               <div className="g2">
                 <div className="fg">
-                  <label className="flbl">Presupuesto (USD/día)</label>
-                  <input className="finput" type="number" value={form.budget} onChange={e => set('budget', e.target.value)} />
+                  <label className="flbl">Presupuesto/día</label>
+                  <div style={{ display: 'flex', gap: 0 }}>
+                    {(['USD', 'ARS'] as Currency[]).map(cur => (
+                      <button key={cur} onClick={() => setCurrency(cur)} style={{
+                        padding: '8px 11px', fontSize: 11, fontFamily: "'DM Mono',monospace",
+                        background: currency === cur ? C.accentDim : C.surface,
+                        color: currency === cur ? C.accent : C.textMuted,
+                        border: `1px solid ${currency === cur ? C.accent : C.border}`,
+                        borderRadius: cur === 'USD' ? '7px 0 0 7px' : '0 7px 7px 0',
+                        cursor: 'pointer', transition: 'all .15s',
+                      }}>{cur}</button>
+                    ))}
+                    <input
+                      className="finput"
+                      type="number"
+                      value={form.budget}
+                      onChange={e => set('budget', e.target.value)}
+                      style={{ borderRadius: '0 7px 7px 0', borderLeft: 'none', flex: 1, minWidth: 0 }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 3 }}>
+                    {currency === 'ARS' ? `≈ $${Math.round(parseFloat(form.budget || '0') / 1100).toFixed(0)} USD/día` : `≈ $${Math.round(parseFloat(form.budget || '0') * 1100).toLocaleString('es-AR')} ARS/día`}
+                  </div>
                 </div>
                 <div className="fg">
                   <label className="flbl">Objetivo</label>
@@ -153,28 +228,20 @@ export default function NewCampaign() {
               <label className="flbl" style={{ marginBottom: 7, display: 'block' }}>Video o imagen principal</label>
               <FileUploadZone
                 accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp"
-                multiple={false}
-                maxSizeMB={500}
-                icon="🎬"
+                multiple={false} maxSizeMB={500} icon="🎬"
                 label="Arrastrá o hacé click para subir"
                 hint="MP4, MOV, JPG, PNG · máx 500 MB"
-                value={mainFiles}
-                onChange={setMainFiles}
-                onUpload={handleUpload}
+                value={mainFiles} onChange={setMainFiles} onUpload={handleUpload}
               />
             </div>
             <div>
               <label className="flbl" style={{ marginBottom: 7, display: 'block' }}>Fotos adicionales</label>
               <FileUploadZone
                 accept="image/jpeg,image/png,image/webp"
-                multiple={true}
-                maxSizeMB={50}
-                icon="🖼️"
+                multiple={true} maxSizeMB={50} icon="🖼️"
                 label="Arrastrá las fotos aquí"
                 hint="JPG, PNG, WebP · máx 50 MB por foto"
-                value={extraFiles}
-                onChange={setExtraFiles}
-                onUpload={handleUpload}
+                value={extraFiles} onChange={setExtraFiles} onUpload={handleUpload}
               />
             </div>
             <div style={{ marginTop: 13, padding: '10px 12px', background: C.accentDim, borderRadius: 8, fontSize: 12, color: C.accent, lineHeight: 1.5 }}>
@@ -184,7 +251,7 @@ export default function NewCampaign() {
         </div>
       )}
 
-      {/* Step 2: AI analysis */}
+      {/* ── Step 2: AI analysis ─────────────────────────────────────────────── */}
       {step === 2 && (
         <div className="card" style={{ maxWidth: 540, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', padding: '14px 0' }}>
@@ -195,9 +262,7 @@ export default function NewCampaign() {
                 <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18, lineHeight: 1.6 }}>
                   La IA va a analizar tu producto y crear la estrategia perfecta de Meta Ads: hook viral, audiencia, copy y formato ideal.
                 </div>
-                <button className="btn btn-p" style={{ padding: '10px 24px' }} onClick={runAnalysis}>
-                  🤖 Iniciar análisis IA
-                </button>
+                <button className="btn btn-p" style={{ padding: '10px 24px' }} onClick={runAnalysis}>🤖 Iniciar análisis IA</button>
               </>
             )}
 
@@ -219,17 +284,16 @@ export default function NewCampaign() {
               <div style={{ textAlign: 'left' }}>
                 <div style={{ textAlign: 'center', marginBottom: 16 }}>
                   <div style={{ fontSize: 30 }}>✅</div>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14, marginTop: 5 }}>Estrategia generada por IA</div>
+                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14, marginTop: 5 }}>Análisis completado</div>
                   {analyzeError && <div style={{ fontSize: 11, color: C.amber, marginTop: 5 }}>⚠️ {analyzeError}</div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   {([
-                    ['Hook viral', displayStrategy.hook],
+                    ['Gancho', displayStrategy.hook],
+                    ['Tono', displayStrategy.styleNotes ?? 'Urgencia + beneficio directo'],
+                    ['Formato', displayStrategy.format?.replace('_', ':') ?? '9:16'],
                     ['Audiencia', displayStrategy.audience?.description ?? '—'],
-                    ['Edad', displayStrategy.audience ? `${displayStrategy.audience.age_min ?? 18}–${displayStrategy.audience.age_max ?? 45} años` : '—'],
-                    ['Formato recomendado', displayStrategy.format?.replace('_', ':') ?? '9:16'],
                     ['CTA', displayStrategy.cta ?? '—'],
-                    ['Estilo visual', displayStrategy.styleNotes ?? '—'],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.border}22`, fontSize: 13 }}>
                       <span style={{ color: C.textMuted, flexShrink: 0, marginRight: 12 }}>{k}</span>
@@ -251,45 +315,102 @@ export default function NewCampaign() {
         </div>
       )}
 
-      {/* Step 3: Generated creatives */}
+      {/* ── Step 3: Audience config + Generated creatives ───────────────────── */}
       {step === 3 && (
-        <div>
-          <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Creativos generados por IA</div>
-          <div className="g3">
-            {CREATIVE_CONFIGS.map((cfg, i) => (
-              <div key={i} style={{ background: C.surface, border: `1.5px solid ${i === 0 ? C.accent : C.border}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = C.accent)}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = i === 0 ? C.accent : C.border)}>
-                <div style={{ aspectRatio: cfg.fmt === '9:16' ? '9/16' : '4/5', position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg,${cfg.from},${cfg.to})` }}>
-                  {cfg.best && (
-                    <div style={{ position: 'absolute', top: 8, right: 8, background: C.accent, color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, zIndex: 2 }}>★ Recomendado</div>
-                  )}
-                  {creativeImages[i] ? (
-                    <img src={creativeImages[i]} alt={cfg.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ fontSize: 32 }}>{cfg.emoji}</div>
-                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'rgba(255,255,255,.4)' }}>{cfg.fmt}</div>
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: '10px 11px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 3 }}>{cfg.label}</div>
-                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2, fontFamily: "'DM Mono',monospace", marginBottom: 8 }}>Auto-generado · {cfg.fmt}</div>
-                  {creativeImages[i] && (
-                    <a href={creativeImages[i]} download={`creativo-${cfg.fmt.replace(':','-')}.jpg`}
-                      style={{ display: 'block', textAlign: 'center', fontSize: 11, padding: '5px', border: `1px solid ${C.border}`, borderRadius: 6, color: C.textMuted, textDecoration: 'none', background: C.bg }}>
-                      📥 Descargar
-                    </a>
-                  )}
+        <div className="g2" style={{ gap: 16 }}>
+          {/* Left: Audience & Location */}
+          <div className="card">
+            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Audiencia y zona</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="fg">
+                <label className="flbl">Sexo</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['Todos', 'Masculino', 'Femenino'] as Gender[]).map(g => (
+                    <button key={g} onClick={() => setGender(g)} style={btnStyle(gender === g)}>{g}</button>
+                  ))}
                 </div>
               </div>
-            ))}
+
+              <div className="fg">
+                <label className="flbl">Rango de edad: {ageMin}–{ageMax} años</label>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <input type="range" min={13} max={65} value={ageMin}
+                    onChange={e => setAgeMin(Math.min(+e.target.value, ageMax - 1))}
+                    style={{ flex: 1, accentColor: C.accent }} />
+                  <input type="range" min={13} max={65} value={ageMax}
+                    onChange={e => setAgeMax(Math.max(+e.target.value, ageMin + 1))}
+                    style={{ flex: 1, accentColor: C.accent }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textMuted, fontFamily: "'DM Mono',monospace", marginTop: 3 }}>
+                  <span>Desde {ageMin}</span><span>Hasta {ageMax}</span>
+                </div>
+              </div>
+
+              <div className="fg">
+                <label className="flbl">Zona geográfica</label>
+                <select className="fsel" value={zone} onChange={e => setZone(e.target.value)}>
+                  {ZONES_AR.map(z => <option key={z}>{z}</option>)}
+                </select>
+              </div>
+
+              <div className="fg">
+                <label className="flbl">Intereses (separados por coma)</label>
+                <input className="finput" placeholder="ej. moda, calzado, deporte, estilo de vida" value={interests} onChange={e => setInterests(e.target.value)} />
+                <div style={{ fontSize: 10, color: C.textMuted, marginTop: 3 }}>La IA usa estos intereses para afinar la segmentación</div>
+              </div>
+
+              {strategy?.audience && (
+                <div style={{ padding: '9px 12px', background: C.accentDim, border: `1px solid ${C.accent}33`, borderRadius: 8, fontSize: 12, color: C.accent }}>
+                  💡 IA sugiere: <strong>{strategy.audience.description}</strong>
+                  {strategy.audience.age_min && <span> · {strategy.audience.age_min}–{strategy.audience.age_max} años</span>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Generated creatives */}
+          <div>
+            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Creativos generados por IA</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+              {CREATIVE_CONFIGS.map((cfg, i) => (
+                <div key={i} style={{ background: C.surface, border: `1.5px solid ${i === 0 ? C.accent : C.border}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = C.accent)}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = i === 0 ? C.accent : C.border)}>
+                  <div style={{
+                    aspectRatio: cfg.fmt === '9:16' ? '9/16' : cfg.fmt === '4:5' ? '4/5' : '1',
+                    position: 'relative', overflow: 'hidden',
+                    background: `linear-gradient(135deg,${cfg.from},${cfg.to})`,
+                  }}>
+                    {cfg.best && (
+                      <div style={{ position: 'absolute', top: 8, right: 8, background: C.accent, color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, zIndex: 2 }}>★ Rec.</div>
+                    )}
+                    {creativeImages[i] ? (
+                      <img src={creativeImages[i]} alt={cfg.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
+                        <Spinner size={16} />
+                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'rgba(255,255,255,.4)' }}>{cfg.fmt}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 2 }}>{cfg.label}</div>
+                    <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "'DM Mono',monospace", marginBottom: 7 }}>{cfg.fmt}</div>
+                    {creativeImages[i] && (
+                      <a href={creativeImages[i]} download={`creativo-${cfg.fmt.replace(':', '-')}.jpg`}
+                        style={{ display: 'block', textAlign: 'center', fontSize: 10, padding: '4px', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMuted, textDecoration: 'none', background: C.bg }}>
+                        📥 Descargar
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Step 4: Publish */}
+      {/* ── Step 4: Publish ─────────────────────────────────────────────────── */}
       {step === 4 && (
         <div className="g2" style={{ gap: 16 }}>
           <div className="card">
@@ -299,16 +420,19 @@ export default function NewCampaign() {
             </div>
             {[
               ['Campaña', form.name || 'Nueva campaña IA'],
-              ['Presupuesto', `$${form.budget} USD/día`],
+              ['Presupuesto', `${form.budget} ${currency}/día`],
               ['Objetivo', form.objective],
               ['Formatos', 'Reel + Story + Feed'],
-              ['Segmentación', strategy?.audience?.description ?? 'IA: Audiencia optimizada'],
+              ['Sexo', gender],
+              ['Edad', `${ageMin}–${ageMax} años`],
+              ['Zona', zone],
+              ['Intereses', interests || 'IA optimizará automáticamente'],
               ['Hook IA', strategy?.hook ?? '—'],
               ['Pixel Meta', 'Vinculado ✓'],
               ['Material subido', `${mainFiles.filter(f => f.status === 'done').length} principal + ${extraFiles.filter(f => f.status === 'done').length} adicional`],
             ].map(([k, v], i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: `1px solid ${C.border}22` }}>
-                <span style={{ color: C.textMuted }}>{k}</span><span style={{ fontWeight: 500, maxWidth: '60%', textAlign: 'right' }}>{v}</span>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '6px 0', borderBottom: `1px solid ${C.border}22` }}>
+                <span style={{ color: C.textMuted }}>{k}</span><span style={{ fontWeight: 500, maxWidth: '55%', textAlign: 'right' }}>{v}</span>
               </div>
             ))}
           </div>
@@ -326,12 +450,14 @@ export default function NewCampaign() {
         </div>
       )}
 
+      {/* ── Navigation ──────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
         <button className="btn btn-g" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1}>← Atrás</button>
+
         {step === 2 && !strategy && !analyzing ? (
           <button className="btn btn-p" onClick={runAnalysis}>🤖 Analizar con IA</button>
         ) : step === 2 && strategy ? (
-          <button className="btn btn-p" onClick={goToCreatives}>Generar creativos →</button>
+          <button className="btn btn-p" onClick={goToCreatives}>🎨 Generar creativos →</button>
         ) : step < 4 ? (
           <button className="btn btn-p" onClick={() => setStep(step + 1)} disabled={step === 2 && analyzing}>
             {analyzing ? <><Spinner size={14} color="#fff" /> Analizando...</> : 'Continuar →'}

@@ -52,8 +52,8 @@ export class AuthService {
     const verifyToken = this.secureToken();
 
     const { rows } = await this.db.query(
-      `INSERT INTO users (email, password_hash, full_name, email_verify_token)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO users (email, password_hash, full_name, email_verify_token, email_verified, status)
+       VALUES ($1, $2, $3, $4, TRUE, 'active')
        RETURNING id, email, full_name, role, status`,
       [dto.email.toLowerCase(), passwordHash, dto.fullName, verifyToken],
     );
@@ -71,9 +71,10 @@ export class AuthService {
       );
     }
 
-    await this.emailService.sendVerification(user.email, user.full_name, verifyToken);
+    // Send verification email if Resend is configured — non-blocking
+    this.emailService.sendVerification(user.email, user.full_name, verifyToken).catch(() => {});
 
-    return { message: 'Registro exitoso. Revisá tu email para verificar tu cuenta.' };
+    return { message: 'Registro exitoso. ¡Ya podés iniciar sesión!' };
   }
 
   // ── Verify email ──────────────────────────────────────────────────────────

@@ -365,7 +365,7 @@ export default function Creatives() {
   const filtered = creatives.filter(c => filter === 'todos' || c.platform === filter);
 
   return (
-    <div className="content fade-in">
+    <div className="content fade-in" translate="no">
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, background: C.green, color: '#fff', padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 500, zIndex: 999, boxShadow: '0 4px 20px #0006' }}>{toast}</div>}
 
       <div className="g4" style={{ marginBottom: 18 }}>
