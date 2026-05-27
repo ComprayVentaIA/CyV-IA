@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HfInference } from '@huggingface/inference';
 import * as ffmpeg from 'fluent-ffmpeg';
 import * as os from 'os';
 import * as path from 'path';
@@ -24,18 +23,22 @@ const STYLE_PROMPTS: Record<string, string> = {
   'Producto hero':   'luxury hero product shot, dramatic studio lighting, dark background, ultra detailed, cinematic',
 };
 
+const HF_MODEL = 'black-forest-labs/FLUX.1-schnell';
+const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
+
 @Injectable()
 export class GenerativeService {
-  private readonly hf: HfInference | null;
+  private readonly apiKey: string;
   private readonly enabled: boolean;
   private readonly logger = new Logger(GenerativeService.name);
 
   constructor(private readonly config: ConfigService) {
-    const apiKey = config.get<string>('huggingface.apiKey');
-    this.enabled = !!apiKey;
-    this.hf = this.enabled ? new HfInference(apiKey) : null;
+    this.apiKey = config.get<string>('huggingface.apiKey') ?? '';
+    this.enabled = !!this.apiKey;
     if (!this.enabled) {
       this.logger.warn('HUGGINGFACE_API_KEY not set — AI image generation disabled');
+    } else {
+      this.logger.log('HuggingFace FLUX.1-schnell ready');
     }
   }
 
@@ -47,27 +50,44 @@ export class GenerativeService {
     return `${product}${hookPart}, ${styleDesc}, Meta Ads creative, social media advertisement, photorealistic, no text overlay, no watermark, clean composition`;
   }
 
-  // ── Generate image via HuggingFace FLUX.1-schnell ─────────────────────────
+  // ── Generate image via HuggingFace FLUX.1-schnell (direct fetch) ──────────
 
   async generateImage(product: string, style: string, format: Format = '9:16', hook?: string): Promise<string> {
-    if (!this.enabled || !this.hf) {
+    if (!this.enabled) {
       throw new Error('HUGGINGFACE_API_KEY no configurado. Agregalo en Railway → Variables.');
     }
 
     const prompt = this.buildPrompt(product, style, hook);
     const [width, height] = FORMAT_SIZE[format];
 
-    this.logger.log(`Generating image: "${prompt.slice(0, 60)}..." ${width}x${height}`);
+    this.logger.log(`[HF] Calling FLUX.1-schnell: "${prompt.slice(0, 60)}..." ${width}x${height}`);
 
-    const raw = await (this.hf as any).textToImage({
-      model: 'black-forest-labs/FLUX.1-schnell',
-      inputs: prompt,
-      parameters: { width, height, num_inference_steps: 4 },
-    }) as Blob;
+    const response = await fetch(HF_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'x-wait-for-model': 'true',
+      },
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: { width, height, num_inference_steps: 4 },
+      }),
+    });
 
-    const arrayBuffer = await raw.arrayBuffer();
-    const b64 = Buffer.from(arrayBuffer).toString('base64');
-    return `data:image/jpeg;base64,${b64}`;
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      this.logger.error(`[HF] Error ${response.status}: ${errorText.slice(0, 300)}`);
+      throw new Error(`HuggingFace error ${response.status}: ${errorText.slice(0, 100)}`);
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    this.logger.log(`[HF] Response OK — content-type: ${contentType}`);
+
+    const buffer = await response.arrayBuffer();
+    const b64 = Buffer.from(buffer).toString('base64');
+    const mime = contentType.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
+    return `data:${mime};base64,${b64}`;
   }
 
   // ── Generate cinematic video from image using ffmpeg ───────────────────────
@@ -79,11 +99,9 @@ export class GenerativeService {
     const imgPath = path.join(tmpDir, `conversia_img_${ts}.jpg`);
     const vidPath = path.join(tmpDir, `conversia_vid_${ts}.mp4`);
 
-    // Write image to temp file
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     fs.writeFileSync(imgPath, Buffer.from(base64Data, 'base64'));
 
-    // Build cinematic filter based on movement
     const frames = 150; // 6s at 25fps
     const s = `${width}x${height}`;
 
@@ -94,12 +112,10 @@ export class GenerativeService {
       pan_left:  `zoompan=z='1.2':x='max(iw*(1-1/zoom)-on*3,0)':y='(ih-oh)/2':d=${frames}:s=${s}:fps=25,format=yuv420p`,
     };
 
-    const vf = filterMap[movement];
-
     await new Promise<void>((resolve, reject) => {
       ffmpeg(imgPath)
         .inputOptions(['-loop 1', '-framerate 25'])
-        .videoFilter(vf)
+        .videoFilter(filterMap[movement])
         .outputOptions(['-t 6', '-c:v libx264', '-crf 23', '-preset fast', '-movflags +faststart'])
         .output(vidPath)
         .on('start', cmd => this.logger.log(`ffmpeg: ${cmd.slice(0, 80)}...`))
@@ -111,7 +127,6 @@ export class GenerativeService {
     const videoBuffer = fs.readFileSync(vidPath);
     const b64 = videoBuffer.toString('base64');
 
-    // Cleanup temp files
     [imgPath, vidPath].forEach(f => { try { fs.unlinkSync(f); } catch { /* ignore */ } });
 
     return `data:video/mp4;base64,${b64}`;
