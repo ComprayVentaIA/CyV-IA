@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import * as ffmpeg from 'fluent-ffmpeg';
 import * as os from 'os';
 import * as path from 'path';
@@ -62,30 +63,23 @@ export class GenerativeService {
 
     this.logger.log(`[HF] Calling FLUX.1-schnell: "${prompt.slice(0, 60)}..." ${width}x${height}`);
 
-    const response = await fetch(HF_API_URL, {
-      method: 'POST',
+    const response = await axios.post(HF_API_URL, {
+      inputs: prompt,
+      parameters: { width, height, num_inference_steps: 4 },
+    }, {
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         'x-wait-for-model': 'true',
       },
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: { width, height, num_inference_steps: 4 },
-      }),
+      responseType: 'arraybuffer',
+      timeout: 120_000,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      this.logger.error(`[HF] Error ${response.status}: ${errorText.slice(0, 300)}`);
-      throw new Error(`HuggingFace error ${response.status}: ${errorText.slice(0, 100)}`);
-    }
-
-    const contentType = response.headers.get('content-type') ?? '';
+    const contentType = (response.headers['content-type'] as string) ?? 'image/jpeg';
     this.logger.log(`[HF] Response OK — content-type: ${contentType}`);
 
-    const buffer = await response.arrayBuffer();
-    const b64 = Buffer.from(buffer).toString('base64');
+    const b64 = Buffer.from(response.data as ArrayBuffer).toString('base64');
     const mime = contentType.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
     return `data:${mime};base64,${b64}`;
   }
