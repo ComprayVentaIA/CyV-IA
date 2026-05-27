@@ -57,6 +57,7 @@ export interface Creative {
   bg: string;
   hook?: string;
   platform: 'reels' | 'stories' | 'feed';
+  imageUrl?: string;
 }
 
 export interface Plan {

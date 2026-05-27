@@ -98,7 +98,7 @@ Generá una estrategia completa en JSON con esta estructura exacta:
 Respondé SOLO con el JSON válido, sin texto adicional.`;
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -134,7 +134,7 @@ Generá un array JSON de insights con esta estructura:
 Máximo 6 insights. Ordenalos por prioridad. SOLO JSON, sin texto adicional.`;
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -173,7 +173,7 @@ Generá sugerencias en JSON:
 SOLO JSON.`;
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -283,7 +283,7 @@ Respondé SOLO con este JSON válido (sin texto adicional):
     const safeFormat = this.sanitize(format, 10);
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 300,
       messages: [{
         role: 'user',
