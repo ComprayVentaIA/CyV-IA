@@ -39,10 +39,14 @@ export const DATABASE_POOL = 'DATABASE_POOL';
           console.error('Unexpected error on idle DB client', err);
         });
 
-        // Verify connection
-        const client = await pool.connect();
-        console.log('✅ PostgreSQL connected');
-        client.release();
+        // Verify connection — non-fatal so the app starts even if DB is momentarily unreachable
+        try {
+          const client = await pool.connect();
+          console.log('✅ PostgreSQL connected');
+          client.release();
+        } catch (err: any) {
+          console.error('⚠️  PostgreSQL initial ping failed (will retry on first request):', err.message);
+        }
 
         return pool;
       },
