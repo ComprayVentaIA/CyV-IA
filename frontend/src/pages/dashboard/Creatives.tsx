@@ -75,11 +75,15 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
     setPreviewImg(img);
   };
 
+  // Wraps any promise with a timeout — resolves/rejects whichever comes first
+  const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
   const makeScript = async () => {
     if (!product.trim()) return;
     setGenScript(true);
     try {
-      const res = await aiApi.generateScript(product, tpl.name, fmt);
+      const res = await withTimeout(aiApi.generateScript(product, tpl.name, fmt), 7000);
       const txt = (res.data as { text?: string })?.text ?? '';
       setScript(txt);
       const firstHook = txt.split(/[.!\n]/)[0]?.slice(0, 30) ?? 'Hook aquí';
@@ -99,12 +103,13 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
     setGenerating(true); setProgress(0); setDone(null);
 
     let activeScript = script;
-    let activeHook = hook;
+    let activeHook = hook || product;
+
+    setProgress(15);
 
     if (!activeScript.trim()) {
-      setProgress(12);
       try {
-        const res = await aiApi.generateScript(product, tpl.name, fmt);
+        const res = await withTimeout(aiApi.generateScript(product, tpl.name, fmt), 6000);
         const txt = (res.data as { text?: string })?.text ?? (res.data as any)?.data?.text ?? '';
         if (txt) {
           activeScript = txt;
@@ -112,12 +117,12 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
           setScript(activeScript);
           setHook(activeHook);
         }
-      } catch { /* keep current hook */ }
+      } catch { /* timeout or error — canvas generates with product name as hook */ }
     }
 
-    setProgress(30);
-    await new Promise(r => setTimeout(r, 300));
-    setProgress(55);
+    setProgress(50);
+    await new Promise(r => setTimeout(r, 200));
+    setProgress(75);
 
     // Generate actual canvas image
     const imageUrl = generateCreativeImage({
@@ -182,7 +187,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
   const maxWidth = fmt === '9:16' ? 160 : fmt === '4:5' ? 210 : 230;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 260px', gap: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', height: 540 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 260px', gap: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', height: 580 }}>
       {/* Left: Templates + Avatars */}
       <div style={{ background: C.surface, borderRight: `1px solid ${C.border}`, overflowY: 'auto' }}>
         <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', padding: '12px 12px 7px', letterSpacing: '.1em' }}>Plantillas</div>
@@ -248,44 +253,96 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
         )}
       </div>
 
-      {/* Right: Config */}
-      <div style={{ background: C.surface, borderLeft: `1px solid ${C.border}`, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, fontSize: 13 }}>Configuración</div>
-        <div className="fg">
-          <label className="flbl">Producto</label>
-          <input className="finput" placeholder="ej. Nike Air Max" value={product} onChange={e => setProduct(e.target.value)} style={{ fontSize: 12 }} />
-        </div>
-        <div className="fg">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <label className="flbl">Script IA</label>
-            <button onClick={makeScript} disabled={genScript || !product.trim()} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, border: `1px solid ${C.accent}44`, background: C.accentDim, color: C.accent, cursor: 'pointer' }}>
-              {genScript ? <Spinner size={10} /> : '✨ Generar'}
-            </button>
+      {/* Right: Config — scrollable content + sticky button */}
+      <div style={{ background: C.surface, borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* scrollable fields */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, fontSize: 13 }}>Configuración</div>
+          <div className="fg">
+            <label className="flbl">Producto <span style={{ color: C.red }}>*</span></label>
+            <input
+              className="finput"
+              placeholder="ej. Nike Air Max"
+              value={product}
+              onChange={e => {
+                setProduct(e.target.value);
+                if (e.target.value.trim()) refreshPreview(hook || e.target.value, e.target.value);
+              }}
+              style={{ fontSize: 12 }}
+            />
+            {!product.trim() && (
+              <div style={{ fontSize: 10, color: C.amber, marginTop: 4 }}>
+                ⚠️ Ingresá el nombre del producto para generar
+              </div>
+            )}
           </div>
-          <textarea className="ftxt" style={{ minHeight: 70, fontSize: 11 }} placeholder="Script generado por IA…" value={script} onChange={e => setScript(e.target.value)} />
+          <div className="fg">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <label className="flbl">Script IA</label>
+              <button onClick={makeScript} disabled={genScript || !product.trim()} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, border: `1px solid ${C.accent}44`, background: C.accentDim, color: C.accent, cursor: product.trim() ? 'pointer' : 'not-allowed', opacity: product.trim() ? 1 : 0.5 }}>
+                {genScript ? <Spinner size={10} /> : '✨ Generar'}
+              </button>
+            </div>
+            <textarea className="ftxt" style={{ minHeight: 65, fontSize: 11 }} placeholder="Script generado por IA…" value={script} onChange={e => setScript(e.target.value)} />
+          </div>
+          <div className="fg">
+            <label className="flbl">Hook superpuesto</label>
+            <input className="finput" placeholder="¿Todavía pagás de más?" value={hook}
+              onChange={e => { setHook(e.target.value); if (product.trim()) refreshPreview(e.target.value, product); }}
+              style={{ fontSize: 12 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {(['9:16', '4:5', '1:1'] as const).map(f => (
+              <button key={f} onClick={() => fmtChanged(f)} style={{ flex: 1, padding: '5px 2px', borderRadius: 7, border: `1.5px solid ${fmt === f ? C.accent : C.border}`, background: fmt === f ? C.accentDim : 'transparent', color: fmt === f ? C.accent : C.textMuted, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono',monospace" }}>{f}</button>
+            ))}
+          </div>
+          <div className="fg"><label className="flbl">Música</label><select className="fsel" style={{ fontSize: 11 }} value={music} onChange={e => setMusic(+e.target.value)}>{MUSIC_LIST.map((m, i) => <option key={i} value={i}>{m}</option>)}</select></div>
+          <div className="fg"><label className="flbl">Voz avatar</label><select className="fsel" style={{ fontSize: 11 }} value={voice} onChange={e => setVoice(+e.target.value)}>{VOICE_LIST.map((v, i) => <option key={i} value={i}>{v}</option>)}</select></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 9px', background: C.bg, borderRadius: 7, fontSize: 11 }}>
+            <span>Subtítulos auto</span><Toggle checked={subtitles} onChange={() => setSubtitles(v => !v)} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 9px', background: C.bg, borderRadius: 7, fontSize: 11 }}>
+            <span>CTA WhatsApp</span><Toggle checked={ctaWa} onChange={() => setCtaWa(v => !v)} />
+          </div>
         </div>
-        <div className="fg">
-          <label className="flbl">Hook superpuesto</label>
-          <input className="finput" placeholder="¿Todavía pagás de más?" value={hook}
-            onChange={e => { setHook(e.target.value); refreshPreview(e.target.value, product); }}
-            style={{ fontSize: 12 }} />
+
+        {/* Sticky generate button — always visible */}
+        <div style={{ padding: '10px 14px', borderTop: `1px solid ${C.border}`, background: C.surface }}>
+          {done && !generating && (
+            <div style={{ background: C.greenDim, border: `1px solid ${C.green}33`, borderRadius: 8, padding: '7px 10px', textAlign: 'center', marginBottom: 8, display: 'flex', gap: 7, justifyContent: 'center' }}>
+              <button className="btn btn-green btn-sm" onClick={() => onAttach(done)}>📎 Adjuntar</button>
+              <a href={done.imageUrl} download={`${done.name}.jpg`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Bajar</a>
+            </div>
+          )}
+          <button
+            onClick={generate}
+            disabled={generating || !product.trim()}
+            style={{
+              width: '100%', padding: '12px', fontSize: 13, fontWeight: 700,
+              background: generating ? C.border : product.trim() ? C.grad : '#2a2a3a',
+              color: product.trim() || generating ? '#fff' : C.textDim,
+              border: 'none', borderRadius: 9,
+              cursor: generating || !product.trim() ? 'not-allowed' : 'pointer',
+              transition: 'all .15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            }}
+          >
+            {generating
+              ? <><Spinner color="#fff" /> {progress}% — generando...</>
+              : product.trim()
+                ? '🎬 Generar creativo'
+                : '← Ingresá el producto primero'}
+          </button>
+          {generating && (
+            <div style={{ marginTop: 7 }}>
+              <div style={{ background: C.border, borderRadius: 3, height: 3, overflow: 'hidden' }}>
+                <div style={{ height: 3, borderRadius: 3, background: C.grad, width: `${progress}%`, transition: 'width .3s ease' }} />
+              </div>
+              <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginTop: 4, fontFamily: "'DM Mono',monospace" }}>
+                {progress < 30 ? 'Conectando con IA...' : progress < 60 ? 'Generando script...' : progress < 85 ? 'Renderizando imagen...' : '¡Casi listo!'}
+              </div>
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {(['9:16', '4:5', '1:1'] as const).map(f => (
-            <button key={f} onClick={() => fmtChanged(f)} style={{ flex: 1, padding: '5px 2px', borderRadius: 7, border: `1.5px solid ${fmt === f ? C.accent : C.border}`, background: fmt === f ? C.accentDim : 'transparent', color: fmt === f ? C.accent : C.textMuted, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono',monospace" }}>{f}</button>
-          ))}
-        </div>
-        <div className="fg"><label className="flbl">Música</label><select className="fsel" style={{ fontSize: 11 }} value={music} onChange={e => setMusic(+e.target.value)}>{MUSIC_LIST.map((m, i) => <option key={i} value={i}>{m}</option>)}</select></div>
-        <div className="fg"><label className="flbl">Voz avatar</label><select className="fsel" style={{ fontSize: 11 }} value={voice} onChange={e => setVoice(+e.target.value)}>{VOICE_LIST.map((v, i) => <option key={i} value={i}>{v}</option>)}</select></div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 9px', background: C.bg, borderRadius: 7, fontSize: 11 }}>
-          <span>Subtítulos auto</span><Toggle checked={subtitles} onChange={() => setSubtitles(v => !v)} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 9px', background: C.bg, borderRadius: 7, fontSize: 11 }}>
-          <span>CTA WhatsApp</span><Toggle checked={ctaWa} onChange={() => setCtaWa(v => !v)} />
-        </div>
-        <button onClick={generate} disabled={generating || !product.trim()} style={{ width: '100%', padding: '11px', fontSize: 13, fontWeight: 600, background: (generating || !product.trim()) ? C.border : C.grad, color: '#fff', border: 'none', borderRadius: 9, cursor: (generating || !product.trim()) ? 'not-allowed' : 'pointer', marginTop: 4, transition: 'all .15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-          {generating ? <><Spinner color="#fff" />{progress}%</> : '🎬 Generar creativo'}
-        </button>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Request } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AiService } from './ai.service';
@@ -54,5 +54,19 @@ export class AiController {
   @ApiOperation({ summary: 'Optimizar campaña existente con IA' })
   optimizeCampaign(@Body() body: any) {
     return this.aiService.optimizeCampaign(body);
+  }
+
+  @Post('insights')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generar insights IA para campañas del usuario' })
+  async generateInsights(@Body() body: { campaigns?: any[] }, @Request() req: any) {
+    try {
+      const userId: string = req.user?.userId ?? req.user?.sub ?? 'unknown';
+      const campaigns = body.campaigns ?? [];
+      const insights = await this.aiService.generateReportInsights(campaigns, userId);
+      return { data: insights };
+    } catch {
+      return { data: [] };
+    }
   }
 }
