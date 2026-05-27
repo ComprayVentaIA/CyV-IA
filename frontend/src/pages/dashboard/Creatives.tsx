@@ -55,6 +55,9 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState<Creative | null>(null);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
+  const [videoBase64, setVideoBase64] = useState<string | null>(null);
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [movement, setMovement] = useState<'zoom_in' | 'zoom_out' | 'pan_right' | 'pan_left'>('zoom_in');
   const [subtitles, setSubtitles] = useState(true);
   const [ctaWa, setCtaWa] = useState(true);
 
@@ -100,7 +103,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
 
   const generate = async () => {
     if (!product.trim()) return;
-    setGenerating(true); setProgress(0); setDone(null);
+    setGenerating(true); setProgress(0); setDone(null); setVideoBase64(null);
 
     let activeScript = script;
     let activeHook = hook || product;
@@ -177,6 +180,18 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
     setCreatives(p => [nc, ...p]); setDone(nc); setGenerating(false);
   };
 
+  const animateVideo = async () => {
+    if (!previewImg) return;
+    setGeneratingVideo(true);
+    setVideoBase64(null);
+    try {
+      const res = await aiApi.generateVideo(previewImg, fmt, movement);
+      const b64 = (res.data as any)?.data?.videoBase64 as string | undefined;
+      if (b64) setVideoBase64(b64);
+    } catch { /* non-fatal — usuario puede reintentar */ }
+    setGeneratingVideo(false);
+  };
+
   const fmtChanged = (f: '9:16' | '4:5' | '1:1') => {
     setFmt(f);
     if (hook || product) refreshPreview(hook, product, tpl, av, f);
@@ -229,7 +244,9 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
       {/* Center: Preview */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, background: C.bg, gap: 12 }}>
         <div style={{ width: '100%', maxWidth, aspectRatio, borderRadius: 10, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 60px #0009' }}>
-          {previewImg ? (
+          {videoBase64 ? (
+            <video src={videoBase64} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ) : previewImg ? (
             <img src={previewImg} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           ) : (
             <div style={{ background: `linear-gradient(135deg,${tpl.from},${tpl.to})`, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
@@ -241,9 +258,10 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
               </div>
             </div>
           )}
-          {generating && (
-            <div style={{ position: 'absolute', inset: 0, background: '#000a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {(generating || generatingVideo) && (
+            <div style={{ position: 'absolute', inset: 0, background: '#000a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
               <Spinner size={24} />
+              {generatingVideo && <div style={{ fontSize: 11, color: '#fff', fontFamily: "'DM Mono',monospace" }}>Animando con ffmpeg...</div>}
             </div>
           )}
         </div>
@@ -255,11 +273,20 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
           </div>
         )}
         {done && !generating && (
-          <div style={{ background: C.greenDim, border: `1px solid ${C.green}33`, borderRadius: 9, padding: '9px 13px', textAlign: 'center', maxWidth: 240, width: '100%' }}>
-            <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 7 }}>✅ Creativo listo</div>
-            <div style={{ display: 'flex', gap: 7, justifyContent: 'center' }}>
+          <div style={{ background: C.greenDim, border: `1px solid ${C.green}33`, borderRadius: 9, padding: '9px 13px', textAlign: 'center', maxWidth: 260, width: '100%' }}>
+            <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 7 }}>✅ {videoBase64 ? 'Video listo' : 'Imagen lista'}</div>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-green btn-sm" onClick={() => onAttach(done)}>📎 Adjuntar</button>
-              <a href={done.imageUrl} download={`${done.name}.jpg`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Bajar</a>
+              {videoBase64 ? (
+                <a href={videoBase64} download={`${done.name}.mp4`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Video</a>
+              ) : (
+                <>
+                  <a href={done.imageUrl} download={`${done.name}.jpg`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Imagen</a>
+                  <button className="btn btn-p btn-sm" onClick={animateVideo} disabled={generatingVideo}>
+                    {generatingVideo ? <Spinner size={10} /> : '🎬 Animar'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -308,6 +335,14 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
               <button key={f} onClick={() => fmtChanged(f)} style={{ flex: 1, padding: '5px 2px', borderRadius: 7, border: `1.5px solid ${fmt === f ? C.accent : C.border}`, background: fmt === f ? C.accentDim : 'transparent', color: fmt === f ? C.accent : C.textMuted, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono',monospace" }}>{f}</button>
             ))}
           </div>
+          <div className="fg">
+            <label className="flbl">Movimiento cámara</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+              {([['zoom_in','🔍 Zoom In'],['zoom_out','🔎 Zoom Out'],['pan_right','→ Pan der.'],['pan_left','← Pan izq.']] as const).map(([mv, lbl]) => (
+                <button key={mv} onClick={() => setMovement(mv)} style={{ padding: '5px 4px', borderRadius: 7, border: `1.5px solid ${movement === mv ? C.accent : C.border}`, background: movement === mv ? C.accentDim : 'transparent', color: movement === mv ? C.accent : C.textMuted, cursor: 'pointer', fontSize: 10, fontFamily: "'DM Mono',monospace" }}>{lbl}</button>
+              ))}
+            </div>
+          </div>
           <div className="fg"><label className="flbl">Música</label><select className="fsel" style={{ fontSize: 11 }} value={music} onChange={e => setMusic(+e.target.value)}>{MUSIC_LIST.map((m, i) => <option key={i} value={i}>{m}</option>)}</select></div>
           <div className="fg"><label className="flbl">Voz avatar</label><select className="fsel" style={{ fontSize: 11 }} value={voice} onChange={e => setVoice(+e.target.value)}>{VOICE_LIST.map((v, i) => <option key={i} value={i}>{v}</option>)}</select></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 9px', background: C.bg, borderRadius: 7, fontSize: 11 }}>
@@ -321,9 +356,18 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
         {/* Sticky generate button — always visible */}
         <div style={{ padding: '10px 14px', borderTop: `1px solid ${C.border}`, background: C.surface }}>
           {done && !generating && (
-            <div style={{ background: C.greenDim, border: `1px solid ${C.green}33`, borderRadius: 8, padding: '7px 10px', textAlign: 'center', marginBottom: 8, display: 'flex', gap: 7, justifyContent: 'center' }}>
+            <div style={{ background: C.greenDim, border: `1px solid ${C.green}33`, borderRadius: 8, padding: '7px 10px', textAlign: 'center', marginBottom: 8, display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-green btn-sm" onClick={() => onAttach(done)}>📎 Adjuntar</button>
-              <a href={done.imageUrl} download={`${done.name}.jpg`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Bajar</a>
+              {videoBase64 ? (
+                <a href={videoBase64} download={`${done.name}.mp4`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Video</a>
+              ) : (
+                <>
+                  <a href={done.imageUrl} download={`${done.name}.jpg`} className="btn btn-g btn-sm" style={{ textDecoration: 'none' }}>📥 Imagen</a>
+                  <button className="btn btn-p btn-sm" onClick={animateVideo} disabled={generatingVideo}>
+                    {generatingVideo ? <Spinner size={10} /> : '🎬 Animar'}
+                  </button>
+                </>
+              )}
             </div>
           )}
           <button
