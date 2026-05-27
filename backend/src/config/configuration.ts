@@ -60,6 +60,10 @@ export default () => ({
     apiKey: process.env.ANTHROPIC_API_KEY ?? '',
   },
 
+  huggingface: {
+    apiKey: process.env.HUGGINGFACE_API_KEY ?? '',
+  },
+
   openai: {
     apiKey: process.env.OPENAI_API_KEY ?? '',
   },

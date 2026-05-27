@@ -105,8 +105,9 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
     let activeScript = script;
     let activeHook = hook || product;
 
-    setProgress(15);
+    setProgress(10);
 
+    // Step 1: script IA (rápido, con timeout corto)
     if (!activeScript.trim()) {
       try {
         const res = await withTimeout(aiApi.generateScript(product, tpl.name, fmt), 6000);
@@ -117,27 +118,38 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
           setScript(activeScript);
           setHook(activeHook);
         }
-      } catch { /* timeout or error — canvas generates with product name as hook */ }
+      } catch { /* timeout — continúa con product como hook */ }
     }
 
-    setProgress(50);
-    await new Promise(r => setTimeout(r, 200));
-    setProgress(75);
+    setProgress(30);
 
-    // Generate actual canvas image
-    const imageUrl = generateCreativeImage({
-      hook: activeHook || product,
-      product,
-      format: fmt,
-      style: tpl.name,
-      avatarEmoji: av.emoji,
-      gradientFrom: tpl.from,
-      gradientTo: tpl.to,
-    });
+    // Step 2: imagen real con FLUX.1-schnell via HuggingFace (puede tardar 15-30s en cold start)
+    const ticker = setInterval(() => {
+      setProgress(p => (p < 88 ? p + 1 : p));
+    }, 600);
+
+    let imageUrl: string;
+    try {
+      const res = await aiApi.generateCreative(product, tpl.name, fmt, activeHook || undefined);
+      const b64 = (res.data as any)?.data?.imageBase64 as string | undefined;
+      if (!b64) throw new Error('no image');
+      imageUrl = b64;
+    } catch {
+      // Fallback canvas si HF falla (sin token, rate limit, etc.)
+      imageUrl = generateCreativeImage({
+        hook: activeHook || product,
+        product,
+        format: fmt,
+        style: tpl.name,
+        avatarEmoji: av.emoji,
+        gradientFrom: tpl.from,
+        gradientTo: tpl.to,
+      });
+    } finally {
+      clearInterval(ticker);
+    }
+
     setPreviewImg(imageUrl);
-
-    setProgress(80);
-    await new Promise(r => setTimeout(r, 250));
     setProgress(100);
 
     const nc: Creative = {
@@ -238,8 +250,8 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
         {generating && (
           <div style={{ width: '100%', maxWidth: 240 }}>
             <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6, textAlign: 'center' }}>Generando… {progress}%</div>
-            <div style={{ background: C.border, borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ height: 4, borderRadius: 3, background: C.grad, width: `${progress}%`, transition: 'width .25s ease' }} /></div>
-            <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginTop: 5, fontFamily: "'DM Mono',monospace" }}>{progress < 40 ? 'Generando script IA...' : progress < 75 ? 'Renderizando creativo...' : '¡Casi listo!'}</div>
+            <div style={{ background: C.border, borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ height: 4, borderRadius: 3, background: C.grad, width: `${progress}%`, transition: 'width .6s ease' }} /></div>
+            <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginTop: 5, fontFamily: "'DM Mono',monospace" }}>{progress < 25 ? 'Generando script IA...' : progress < 88 ? '⚡ FLUX.1 generando imagen...' : '¡Casi listo!'}</div>
           </div>
         )}
         {done && !generating && (
@@ -338,7 +350,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
                 <div style={{ height: 3, borderRadius: 3, background: C.grad, width: `${progress}%`, transition: 'width .3s ease' }} />
               </div>
               <div style={{ fontSize: 10, color: C.textDim, textAlign: 'center', marginTop: 4, fontFamily: "'DM Mono',monospace" }}>
-                {progress < 30 ? 'Conectando con IA...' : progress < 60 ? 'Generando script...' : progress < 85 ? 'Renderizando imagen...' : '¡Casi listo!'}
+                {progress < 25 ? 'Generando script IA...' : progress < 88 ? '⚡ FLUX.1 procesando...' : '¡Casi listo!'}
               </div>
             </div>
           )}

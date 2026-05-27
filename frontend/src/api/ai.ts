@@ -9,4 +9,7 @@ export const aiApi = {
 
   analyzeCampaign: (productName: string, description: string, objective: string) =>
     api.post('/ai/analyze-campaign', { productName, description, objective }),
+
+  generateCreative: (product: string, style: string, format: '9:16' | '4:5' | '1:1', hook?: string) =>
+    api.post<{ data: { imageBase64: string } }>('/generative/image', { product, style, format, hook }, { timeout: 90_000 }),
 };
