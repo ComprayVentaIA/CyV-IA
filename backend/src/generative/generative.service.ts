@@ -59,13 +59,13 @@ export class GenerativeService {
 
     this.logger.log(`Generating image: "${prompt.slice(0, 60)}..." ${width}x${height}`);
 
-    const blob = await this.hf.textToImage({
+    const raw = await (this.hf as any).textToImage({
       model: 'black-forest-labs/FLUX.1-schnell',
       inputs: prompt,
-      parameters: { width, height, num_inference_steps: 4 } as any,
-    });
+      parameters: { width, height, num_inference_steps: 4 },
+    }) as Blob;
 
-    const arrayBuffer = await blob.arrayBuffer();
+    const arrayBuffer = await raw.arrayBuffer();
     const b64 = Buffer.from(arrayBuffer).toString('base64');
     return `data:image/jpeg;base64,${b64}`;
   }
