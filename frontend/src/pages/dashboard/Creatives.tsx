@@ -1,10 +1,50 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { Tag, Spinner, Toggle } from '../../components/ui';
 import { aiApi } from '../../api/ai';
 import api from '../../api/client';
 import { C } from '../../styles/theme';
 import type { Creative } from '../../types';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
+
+const HF_URL = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell';
+const HF_KEY = import.meta.env.VITE_HF_API_KEY as string | undefined;
+
+const FORMAT_PX: Record<'9:16' | '4:5' | '1:1', [number, number]> = {
+  '9:16': [576, 1024],
+  '4:5': [640, 800],
+  '1:1': [1024, 1024],
+};
+
+const STYLE_DESC: Record<string, string> = {
+  'Hook urgencia':   'luxury product advertisement, dramatic cinematic lighting, dark moody background, ultra realistic, 8k',
+  'Oferta limitada': 'vibrant sale advertisement, bold colors, product hero shot, commercial photography, high energy',
+  'Unboxing':        'product unboxing photography, lifestyle setting, warm natural lighting, e-commerce style',
+  'Comparativa':     'clean product comparison, studio photography, white background, professional product shot',
+  'Testimonial':     'lifestyle product photography, happy person using product, bright natural environment, authentic',
+  'Producto hero':   'luxury hero product shot, dramatic studio lighting, dark background, ultra detailed, cinematic',
+};
+
+async function generateFluxImage(product: string, style: string, format: '9:16' | '4:5' | '1:1', hook?: string): Promise<string> {
+  if (!HF_KEY) throw new Error('VITE_HF_API_KEY not set');
+  const styleDesc = STYLE_DESC[style] ?? 'professional product advertisement, high quality';
+  const prompt = `${product}${hook ? `, "${hook}" text concept` : ''}, ${styleDesc}, Meta Ads creative, photorealistic, no text overlay, no watermark`;
+  const [width, height] = FORMAT_PX[format];
+  const res = await axios.post(HF_URL, {
+    inputs: prompt,
+    parameters: { width, height, num_inference_steps: 4 },
+  }, {
+    headers: { Authorization: `Bearer ${HF_KEY}`, 'x-wait-for-model': 'true' },
+    responseType: 'blob',
+    timeout: 120_000,
+  });
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(res.data as Blob);
+  });
+}
 
 const AVATARS = [
   { id: 'a1', name: 'Sofía', style: 'Presentadora', emoji: '👩', bg: 'linear-gradient(135deg,#1a0a2e,#2d1555)' },
@@ -126,17 +166,14 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
 
     setProgress(30);
 
-    // Step 2: imagen real con FLUX.1-schnell via HuggingFace (puede tardar 15-30s en cold start)
+    // Step 2: imagen real con FLUX.1-schnell directo desde el browser
     const ticker = setInterval(() => {
       setProgress(p => (p < 88 ? p + 1 : p));
     }, 600);
 
     let imageUrl: string;
     try {
-      const res = await aiApi.generateCreative(product, tpl.name, fmt, activeHook || undefined);
-      const b64 = (res.data as any)?.data?.imageBase64 as string | undefined;
-      if (!b64) throw new Error('no image');
-      imageUrl = b64;
+      imageUrl = await generateFluxImage(product, tpl.name, fmt, activeHook || undefined);
     } catch {
       // Fallback canvas si HF falla (sin token, rate limit, etc.)
       imageUrl = generateCreativeImage({
