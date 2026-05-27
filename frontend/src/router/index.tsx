@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, Component, type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Spinner } from '../components/ui';
 
@@ -7,33 +7,46 @@ import { Spinner } from '../components/ui';
 import LandingPage from '../pages/LandingPage';
 import AuthPage from '../pages/AuthPage';
 
+// Wraps lazy() so a failed chunk load (stale Vercel CDN cache) reloads the
+// page once instead of crashing with "módulo importado dinámicamente".
+function lazyLoad<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    factory().catch(() => {
+      window.location.reload();
+      return new Promise<never>(() => {});
+    }),
+  );
+}
+
 // ── Lazy loaded (split by route) ──────────────────────────────────────────────
-const CheckoutPage    = lazy(() => import('../pages/CheckoutPage'));
-const SuccessPage     = lazy(() => import('../pages/SuccessPage'));
+const CheckoutPage    = lazyLoad(() => import('../pages/CheckoutPage'));
+const SuccessPage     = lazyLoad(() => import('../pages/SuccessPage'));
 
-const DashShell       = lazy(() => import('../pages/dashboard/DashShell'));
-const DashOverview    = lazy(() => import('../pages/dashboard/DashOverview'));
-const Campaigns       = lazy(() => import('../pages/dashboard/Campaigns'));
-const NewCampaign     = lazy(() => import('../pages/dashboard/NewCampaign'));
-const Creatives       = lazy(() => import('../pages/dashboard/Creatives'));
-const Reports         = lazy(() => import('../pages/dashboard/Reports'));
-const Integrations    = lazy(() => import('../pages/dashboard/Integrations'));
-const Billing         = lazy(() => import('../pages/dashboard/Billing'));
-const ConversiaIA     = lazy(() => import('../pages/dashboard/ConversiaIA'));
-const Profile         = lazy(() => import('../pages/dashboard/Profile'));
+const DashShell       = lazyLoad(() => import('../pages/dashboard/DashShell'));
+const DashOverview    = lazyLoad(() => import('../pages/dashboard/DashOverview'));
+const Campaigns       = lazyLoad(() => import('../pages/dashboard/Campaigns'));
+const NewCampaign     = lazyLoad(() => import('../pages/dashboard/NewCampaign'));
+const Creatives       = lazyLoad(() => import('../pages/dashboard/Creatives'));
+const Reports         = lazyLoad(() => import('../pages/dashboard/Reports'));
+const Integrations    = lazyLoad(() => import('../pages/dashboard/Integrations'));
+const Billing         = lazyLoad(() => import('../pages/dashboard/Billing'));
+const ConversiaIA     = lazyLoad(() => import('../pages/dashboard/ConversiaIA'));
+const Profile         = lazyLoad(() => import('../pages/dashboard/Profile'));
 
-const AdminShell      = lazy(() => import('../pages/admin/AdminShell'));
-const AdminOverview   = lazy(() => import('../pages/admin/AdminOverview'));
-const AdminUsers      = lazy(() => import('../pages/admin/AdminUsers'));
-const AdminRoles      = lazy(() => import('../pages/admin/AdminRoles'));
-const AdminBilling    = lazy(() => import('../pages/admin/AdminBilling'));
-const AdminFlags      = lazy(() => import('../pages/admin/AdminFlags'));
-const AdminAITraining = lazy(() => import('../pages/admin/AdminAITraining'));
-const AdminAudit      = lazy(() => import('../pages/admin/AdminAudit'));
-const AdminComms      = lazy(() => import('../pages/admin/AdminComms'));
-const AdminSystem     = lazy(() => import('../pages/admin/AdminSystem'));
+const AdminShell      = lazyLoad(() => import('../pages/admin/AdminShell'));
+const AdminOverview   = lazyLoad(() => import('../pages/admin/AdminOverview'));
+const AdminUsers      = lazyLoad(() => import('../pages/admin/AdminUsers'));
+const AdminRoles      = lazyLoad(() => import('../pages/admin/AdminRoles'));
+const AdminBilling    = lazyLoad(() => import('../pages/admin/AdminBilling'));
+const AdminFlags      = lazyLoad(() => import('../pages/admin/AdminFlags'));
+const AdminAITraining = lazyLoad(() => import('../pages/admin/AdminAITraining'));
+const AdminAudit      = lazyLoad(() => import('../pages/admin/AdminAudit'));
+const AdminComms      = lazyLoad(() => import('../pages/admin/AdminComms'));
+const AdminSystem     = lazyLoad(() => import('../pages/admin/AdminSystem'));
 
-// ── Suspense wrapper ──────────────────────────────────────────────────────────
+// ── Suspense / loading ────────────────────────────────────────────────────────
 function Fallback() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#07070f' }}>
@@ -42,19 +55,53 @@ function Fallback() {
   );
 }
 
-function S({ children }: { children: React.ReactNode }) {
+function S({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Fallback />}>{children}</Suspense>;
 }
 
+// ── Error boundary — catches any render-time crash and reloads ────────────────
+interface EBState { error: boolean }
+class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  state: EBState = { error: false };
+
+  static getDerivedStateFromError(): EBState {
+    return { error: true };
+  }
+
+  componentDidCatch(err: Error) {
+    const msg = err?.message ?? '';
+    if (
+      msg.includes('dynamically imported') ||
+      msg.includes('módulo importado') ||
+      msg.includes('ChunkLoadError') ||
+      msg.includes('Failed to fetch')
+    ) {
+      window.location.reload();
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#07070f', gap: 16 }}>
+          <Spinner size={28} />
+          <div style={{ fontSize: 13, color: '#5a5a80', fontFamily: 'monospace' }}>Actualizando...</div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ── Guards ────────────────────────────────────────────────────────────────────
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return <Fallback />;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 }
 
-function RequireAdmin({ children }: { children: React.ReactNode }) {
+function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return <Fallback />;
   if (!user) return <Navigate to="/auth" replace />;
@@ -66,38 +113,38 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
   { path: '/auth', element: <AuthPage /> },
-  { path: '/checkout', element: <S><CheckoutPage /></S> },
-  { path: '/success', element: <S><SuccessPage /></S> },
+  { path: '/checkout', element: <ErrorBoundary><S><CheckoutPage /></S></ErrorBoundary> },
+  { path: '/success',  element: <ErrorBoundary><S><SuccessPage /></S></ErrorBoundary> },
 
   {
     path: '/dashboard',
-    element: <RequireAuth><S><DashShell /></S></RequireAuth>,
+    element: <RequireAuth><ErrorBoundary><S><DashShell /></S></ErrorBoundary></RequireAuth>,
     children: [
-      { index: true,                    element: <S><DashOverview /></S> },
-      { path: 'campaigns',              element: <S><Campaigns /></S> },
-      { path: 'new-campaign',           element: <S><NewCampaign /></S> },
-      { path: 'creatives',              element: <S><Creatives /></S> },
-      { path: 'conversia-ia',           element: <S><ConversiaIA /></S> },
-      { path: 'reports',                element: <S><Reports /></S> },
-      { path: 'integrations',           element: <S><Integrations /></S> },
-      { path: 'billing',                element: <S><Billing /></S> },
-      { path: 'profile',               element: <S><Profile /></S> },
+      { index: true,         element: <ErrorBoundary><S><DashOverview /></S></ErrorBoundary> },
+      { path: 'campaigns',   element: <ErrorBoundary><S><Campaigns /></S></ErrorBoundary> },
+      { path: 'new-campaign',element: <ErrorBoundary><S><NewCampaign /></S></ErrorBoundary> },
+      { path: 'creatives',   element: <ErrorBoundary><S><Creatives /></S></ErrorBoundary> },
+      { path: 'conversia-ia',element: <ErrorBoundary><S><ConversiaIA /></S></ErrorBoundary> },
+      { path: 'reports',     element: <ErrorBoundary><S><Reports /></S></ErrorBoundary> },
+      { path: 'integrations',element: <ErrorBoundary><S><Integrations /></S></ErrorBoundary> },
+      { path: 'billing',     element: <ErrorBoundary><S><Billing /></S></ErrorBoundary> },
+      { path: 'profile',     element: <ErrorBoundary><S><Profile /></S></ErrorBoundary> },
     ],
   },
 
   {
     path: '/admin',
-    element: <RequireAdmin><S><AdminShell /></S></RequireAdmin>,
+    element: <RequireAdmin><ErrorBoundary><S><AdminShell /></S></ErrorBoundary></RequireAdmin>,
     children: [
-      { index: true,           element: <S><AdminOverview /></S> },
-      { path: 'users',         element: <S><AdminUsers /></S> },
-      { path: 'roles',         element: <S><AdminRoles /></S> },
-      { path: 'billing',       element: <S><AdminBilling /></S> },
-      { path: 'flags',         element: <S><AdminFlags /></S> },
-      { path: 'ai-training',   element: <S><AdminAITraining /></S> },
-      { path: 'audit',         element: <S><AdminAudit /></S> },
-      { path: 'comms',         element: <S><AdminComms /></S> },
-      { path: 'system',        element: <S><AdminSystem /></S> },
+      { index: true,          element: <ErrorBoundary><S><AdminOverview /></S></ErrorBoundary> },
+      { path: 'users',        element: <ErrorBoundary><S><AdminUsers /></S></ErrorBoundary> },
+      { path: 'roles',        element: <ErrorBoundary><S><AdminRoles /></S></ErrorBoundary> },
+      { path: 'billing',      element: <ErrorBoundary><S><AdminBilling /></S></ErrorBoundary> },
+      { path: 'flags',        element: <ErrorBoundary><S><AdminFlags /></S></ErrorBoundary> },
+      { path: 'ai-training',  element: <ErrorBoundary><S><AdminAITraining /></S></ErrorBoundary> },
+      { path: 'audit',        element: <ErrorBoundary><S><AdminAudit /></S></ErrorBoundary> },
+      { path: 'comms',        element: <ErrorBoundary><S><AdminComms /></S></ErrorBoundary> },
+      { path: 'system',       element: <ErrorBoundary><S><AdminSystem /></S></ErrorBoundary> },
     ],
   },
 
