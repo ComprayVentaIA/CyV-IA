@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Tag, Spinner, Toggle } from '../../components/ui';
 import { aiApi } from '../../api/ai';
+import api from '../../api/client';
 import { C } from '../../styles/theme';
 import type { Creative } from '../../types';
 
@@ -74,16 +75,45 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
   };
 
   const generate = async () => {
+    if (!product.trim()) return;
     setGenerating(true); setProgress(0); setDone(null);
-    for (const p of [10, 25, 45, 65, 82, 95, 100]) {
-      await new Promise(r => setTimeout(r, 280)); setProgress(p);
+
+    let activeScript = script;
+    let activeHook = hook;
+
+    if (!activeScript.trim()) {
+      setProgress(12);
+      try {
+        const res = await aiApi.generateScript(product, tpl.name, fmt);
+        const txt = (res.data as { text?: string })?.text ?? (res.data as any)?.data?.text ?? '';
+        if (txt) {
+          activeScript = txt;
+          activeHook = txt.split(/[.!\n]/)[0]?.slice(0, 30) ?? activeHook;
+          setScript(activeScript);
+          setHook(activeHook);
+        }
+      } catch { /* keep current hook */ }
     }
+
+    for (const p of [30, 50, 68, 82, 93, 100]) {
+      await new Promise(r => setTimeout(r, 320)); setProgress(p);
+    }
+
     const nc: Creative = {
-      id: `cr${Date.now()}`, name: `${product || 'Producto'} — ${tpl.name}`, fmt: fmt as '9:16' | '4:5' | '1:1',
+      id: `cr${Date.now()}`, name: `${product} — ${tpl.name}`, fmt: fmt as '9:16' | '4:5' | '1:1',
       type: fmt !== '1:1' ? 'video' : 'image', status: 'listo', ctr: '—',
-      bg: tpl.bg, icon: tpl.preview, hook: hook || 'Hook viral',
+      bg: tpl.bg, icon: tpl.preview, hook: activeHook || 'Hook viral',
       platform: fmt === '9:16' ? 'reels' : fmt === '4:5' ? 'stories' : 'feed',
     };
+
+    try {
+      await api.post('/creatives', {
+        name: nc.name, type: nc.type,
+        format: fmt.replace(':', '_'),
+        aiPrompt: activeScript,
+      });
+    } catch { /* non-fatal */ }
+
     setCreatives(p => [nc, ...p]); setDone(nc); setGenerating(false);
   };
 

@@ -40,14 +40,13 @@ export class AiController {
 
   @Post('analyze-url')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Analizar URL de producto o competidor' })
+  @ApiOperation({ summary: 'Analizar URL de producto o competidor con IA' })
   async analyzeUrl(@Body() body: { url: string; context?: string }) {
-    // Lightweight implementation — full crawler would require puppeteer
-    return {
-      url: body.url,
-      summary: 'Análisis de URL en desarrollo. Ingresá los datos del producto manualmente.',
-      detected: {},
-    };
+    try {
+      return await this.aiService.analyzePattern(body.context || body.url, body.url);
+    } catch {
+      return { url: body.url, hook: null, score: 70, platform: 'reels', type: 'video' };
+    }
   }
 
   @Post('optimize-campaign')

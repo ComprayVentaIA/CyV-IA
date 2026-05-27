@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
 import { AiService } from '../ai/ai.service';
@@ -17,11 +17,34 @@ export interface CreatePatternDto {
 }
 
 @Injectable()
-export class AiTrainingService {
+export class AiTrainingService implements OnModuleInit {
   constructor(
     @Inject(DATABASE_POOL) private readonly db: Pool,
     private readonly aiService: AiService,
   ) {}
+
+  async onModuleInit() {
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS ai_patterns (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id      UUID,
+        source       VARCHAR(255) DEFAULT 'Manual',
+        type         VARCHAR(20) DEFAULT 'video',
+        hook         TEXT NOT NULL,
+        style        TEXT,
+        platform     VARCHAR(50) DEFAULT 'reels',
+        tone         TEXT,
+        visual_notes TEXT,
+        cta          TEXT,
+        audience     TEXT,
+        score        INTEGER DEFAULT 80,
+        active       BOOLEAN DEFAULT TRUE,
+        uses         INTEGER DEFAULT 0,
+        created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `).catch(() => {});
+  }
 
   async findAll(filters?: { platform?: string; active?: boolean; search?: string }) {
     let q = 'SELECT * FROM ai_patterns WHERE 1=1';

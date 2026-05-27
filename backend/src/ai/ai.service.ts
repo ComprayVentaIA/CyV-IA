@@ -228,26 +228,39 @@ Respondé SOLO con el script, sin etiquetas ni explicaciones.`,
   }> {
     const safeContent = this.sanitize(content, 800);
 
+    const isUrl = /^https?:\/\//i.test(safeContent);
+    let detectedPlatform = 'reels';
+    if (isUrl) {
+      if (safeContent.includes('tiktok')) detectedPlatform = 'tiktok';
+      else if (safeContent.includes('youtube')) detectedPlatform = 'youtube';
+      else if (safeContent.includes('facebook') || safeContent.includes('meta')) detectedPlatform = 'feed';
+    }
+
+    const contentBlock = isUrl
+      ? `URL de contenido de ${detectedPlatform}: ${safeContent}
+
+No podés acceder a la URL, pero basándote en el tipo de plataforma, generá un patrón viral típico de alto rendimiento para esa plataforma en el mercado latinoamericano.`
+      : `Contenido del anuncio:\n${safeContent}${sourceUrl ? `\n\nURL fuente: ${sourceUrl}` : ''}`;
+
     const response = await this.client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       messages: [{
         role: 'user',
-        content: `Analizá este contenido publicitario y extraé los campos clave en JSON.
+        content: `Sos experto en publicidad viral de Meta Ads para el mercado latinoamericano. Analizá el siguiente contenido y extraé los patrones clave en JSON.
 
-Contenido: ${safeContent}
-${sourceUrl ? `URL fuente: ${sourceUrl}` : ''}
+${contentBlock}
 
-Respondé SOLO con este JSON válido:
+Respondé SOLO con este JSON válido (sin texto adicional):
 {
-  "hook": "el gancho principal extraído (máx 80 chars)",
-  "style": "estilo visual detectado o null",
+  "hook": "el gancho principal en español rioplatense (máx 80 chars)",
+  "style": "estilo visual (ej: texto grande + transición rápida, UGC, producto en mano)",
   "platform": "reels|stories|feed|tiktok|youtube",
-  "tone": "tono detectado (urgencia, humor, emocional, etc) o null",
-  "visualNotes": "notas sobre el video/imagen si hay o null",
-  "cta": "llamada a la acción detectada o null",
-  "audience": "audiencia objetivo estimada o null",
-  "score": número entre 60 y 95 basado en calidad del hook,
+  "tone": "tono (urgencia|humor|emocional|inspiracional|escasez|oferta)",
+  "visualNotes": "notas sobre edición o visual recomendado",
+  "cta": "llamada a la acción (ej: Escribinos por WhatsApp)",
+  "audience": "audiencia objetivo (ej: Mujeres 22-38, moda)",
+  "score": número entre 65 y 95 según potencial viral,
   "type": "video|image|carousel"
 }`,
       }],
@@ -258,7 +271,7 @@ Respondé SOLO con este JSON válido:
       return JSON.parse(raw.replace(/```json|```/g, '').trim());
     } catch {
       const firstLine = safeContent.split(/[.!\n]/)[0]?.slice(0, 80) ?? 'Hook extraído';
-      return { hook: firstLine, score: 75, platform: 'reels', type: 'video' };
+      return { hook: firstLine, score: 75, platform: detectedPlatform, type: 'video' };
     }
   }
 
