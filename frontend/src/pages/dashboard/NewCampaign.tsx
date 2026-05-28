@@ -60,6 +60,7 @@ export default function NewCampaign() {
 
   const [creativeImages, setCreativeImages] = useState<string[]>([]);
   const [generatingImages, setGeneratingImages] = useState(false);
+  const [fluxError, setFluxError] = useState('');
 
   const handleUpload = useCallback(async (files: File[], onProgress: (pct: number) => void) => {
     const res = await uploadsApi.upload(files, onProgress);
@@ -80,11 +81,14 @@ export default function NewCampaign() {
 
     // Replace with real FLUX.1 images async
     setGeneratingImages(true);
+    setFluxError('');
     Promise.all(
       CREATIVE_CONFIGS.map(cfg =>
-        generateFluxImage(product, style, cfg.fmt, hook).catch(() =>
-          generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to })
-        )
+        generateFluxImage(product, style, cfg.fmt, hook).catch((err: any) => {
+          const msg = err?.message ?? String(err);
+          setFluxError(msg);
+          return generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to });
+        })
       )
     ).then(images => {
       setCreativeImages(images);
@@ -360,6 +364,11 @@ export default function NewCampaign() {
               {generatingImages && (
                 <div style={{ gridColumn: '1/-1', background: C.accentDim, border: `1px solid ${C.accent}44`, borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.accent }}>
                   <Spinner size={12} /> Generando imágenes reales con FLUX.1-schnell... (20-30s)
+                </div>
+              )}
+              {fluxError && !generatingImages && (
+                <div style={{ gridColumn: '1/-1', background: '#2a1500', border: '1px solid #f97316', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#f97316', wordBreak: 'break-all' }}>
+                  ⚠️ FLUX: {fluxError}
                 </div>
               )}
               {CREATIVE_CONFIGS.map((cfg, i) => (

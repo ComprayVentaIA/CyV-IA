@@ -31,8 +31,13 @@ export async function generateFluxImage(
   const styleDesc = STYLE_DESC[style] ?? 'professional product advertisement, high quality';
   const prompt = `${product}${hook ? `, "${hook}" text concept` : ''}, ${styleDesc}, Meta Ads creative, photorealistic, no text overlay, no watermark`;
 
+  const [width, height] = FORMAT_PX[format];
+
   try {
-    const res = await axios.post(HF_URL, { inputs: prompt }, {
+    const res = await axios.post(HF_URL, {
+      inputs: prompt,
+      parameters: { width, height, num_inference_steps: 4 },
+    }, {
       headers: {
         Authorization: `Bearer ${hfKey}`,
         'Content-Type': 'application/json',
