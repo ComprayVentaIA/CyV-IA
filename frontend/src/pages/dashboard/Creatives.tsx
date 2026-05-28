@@ -26,24 +26,31 @@ const STYLE_DESC: Record<string, string> = {
 };
 
 async function generateFluxImage(product: string, style: string, format: '9:16' | '4:5' | '1:1', hook?: string): Promise<string> {
-  if (!HF_KEY) throw new Error('VITE_HF_API_KEY not set');
+  if (!HF_KEY) throw new Error('VITE_HF_API_KEY no está configurado en Vercel');
   const styleDesc = STYLE_DESC[style] ?? 'professional product advertisement, high quality';
   const prompt = `${product}${hook ? `, "${hook}" text concept` : ''}, ${styleDesc}, Meta Ads creative, photorealistic, no text overlay, no watermark`;
   const [width, height] = FORMAT_PX[format];
-  const res = await axios.post(HF_URL, {
-    inputs: prompt,
-    parameters: { width, height, num_inference_steps: 4 },
-  }, {
-    headers: { Authorization: `Bearer ${HF_KEY}`, 'x-wait-for-model': 'true' },
-    responseType: 'blob',
-    timeout: 120_000,
-  });
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(res.data as Blob);
-  });
+  try {
+    const res = await axios.post(HF_URL, { inputs: prompt }, {
+      headers: { Authorization: `Bearer ${HF_KEY}`, 'x-wait-for-model': 'true' },
+      responseType: 'blob',
+      timeout: 120_000,
+    });
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(res.data as Blob);
+    });
+  } catch (err: any) {
+    // Intentar leer el cuerpo del error de HuggingFace
+    if (err?.response?.data instanceof Blob) {
+      const text = await err.response.data.text();
+      throw new Error(`HF ${err.response.status}: ${text.slice(0, 200)}`);
+    }
+    throw err;
+  }
+  void width; void height; // usados en futuras versiones con parámetros
 }
 
 const AVATARS = [
