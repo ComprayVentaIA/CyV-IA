@@ -4,7 +4,7 @@ import FileUploadZone, { type UploadFile } from '../../components/ui/FileUploadZ
 import { uploadsApi } from '../../api/uploads';
 import { aiApi } from '../../api/ai';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
-import { generateDalleImage } from '../../utils/dalleImage';
+import { editProductImage, generateProductImage } from '../../utils/openaiImageEdit';
 import { C } from '../../styles/theme';
 
 const STEPS = ['Producto', 'IA analiza', 'Creativos', 'Publicar'];
@@ -81,16 +81,8 @@ export default function NewCampaign() {
     setGeneratingImages(true);
     setFluxError('');
 
-    if (uploadedPhotoUrl) {
-      // Use the uploaded photo as background — no API call needed
-      Promise.all(
-        CREATIVE_CONFIGS.map(cfg =>
-          generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to, backgroundImageUrl: uploadedPhotoUrl })
-        )
-      ).then(images => {
-        setCreativeImages(images);
-        setGeneratingImages(false);
-      });
+    if (false) {
+      // (placeholder — photo editing now goes through the shared Promise.all below)
     } else {
       // No photo uploaded — show canvas placeholder then replace with FLUX.1
       Promise.all(
@@ -100,9 +92,13 @@ export default function NewCampaign() {
       ).then(placeholders => setCreativeImages(placeholders));
 
       const description = form.desc || undefined;
+      const photoUrl2 = productPhotoUrl;
       Promise.all(
         CREATIVE_CONFIGS.map(cfg =>
-          generateDalleImage(product, style, cfg.fmt, hook, description).catch((err: any) => {
+          (photoUrl2
+            ? editProductImage(photoUrl2, product, style, cfg.fmt, hook, description)
+            : generateProductImage(product, style, cfg.fmt, hook, description)
+          ).catch((err: any) => {
             const msg = err?.message ?? String(err);
             setFluxError(msg);
             return generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to });
@@ -419,30 +415,7 @@ export default function NewCampaign() {
                           <div style={{ position: 'absolute', top: 8, right: 8, background: C.accent, color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, zIndex: 10 }}>★ Rec.</div>
                         )}
 
-                        {photoUrl ? (
-                          /* ── CSS overlay creative using uploaded photo ── */
-                          <>
-                            <img src={photoUrl} alt="producto" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                            {/* Dark gradient for text readability */}
-                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 35%, rgba(0,0,0,0.75) 65%, rgba(0,0,0,0.95) 100%)' }} />
-                            {/* Top branding bar */}
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'rgba(0,0,0,0.5)' }}>
-                              <span style={{ color: '#fff', fontSize: 8, fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>CONVERSIA ADS</span>
-                              <span style={{ color: '#7c5cfc', fontSize: 8, fontFamily: "'DM Mono',monospace" }}>IA</span>
-                            </div>
-                            {/* Hook text */}
-                            <div style={{ position: 'absolute', bottom: 40, left: 8, right: 8, textAlign: 'center' }}>
-                              <div style={{ color: '#fff', fontWeight: 800, fontSize: cfg.fmt === '9:16' ? 17 : 13, lineHeight: 1.2, textShadow: '0 2px 10px rgba(0,0,0,0.9)', textTransform: 'uppercase', marginBottom: 4 }}>
-                                {hook.slice(0, 60)}
-                              </div>
-                              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, fontFamily: "'DM Mono',monospace" }}>{product}</div>
-                            </div>
-                            {/* WhatsApp CTA */}
-                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(90deg,#25d366,#1a9e4f)', padding: '6px 4px', textAlign: 'center', color: '#fff', fontSize: 9, fontWeight: 700 }}>
-                              💬 Escribinos por WhatsApp
-                            </div>
-                          </>
-                        ) : creativeImages[i] ? (
+                                {creativeImages[i] ? (
                           /* ── FLUX.1 or canvas generated image ── */
                           <img src={creativeImages[i]} alt={cfg.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         ) : (
