@@ -61,6 +61,7 @@ export default function NewCampaign() {
   const [creativeImages, setCreativeImages] = useState<string[]>([]);
   const [generatingImages, setGeneratingImages] = useState(false);
   const [fluxError, setFluxError] = useState('');
+  const [productPhotoUrl, setProductPhotoUrl] = useState<string | null>(null);
 
   const handleUpload = useCallback(async (files: File[], onProgress: (pct: number) => void) => {
     const res = await uploadsApi.upload(files, onProgress);
@@ -74,8 +75,8 @@ export default function NewCampaign() {
     const product = form.name || 'Producto';
     const style = strategy.styleNotes ?? 'Hook urgencia';
 
-    // Detect uploaded product photo (use local blob URL — no upload needed)
-    const uploadedPhotoUrl = extraFiles[0]?.preview || mainFiles[0]?.preview || null;
+    // productPhotoUrl is set explicitly in goToCreatives() — no stale closure issue
+    const uploadedPhotoUrl = productPhotoUrl;
 
     setGeneratingImages(true);
     setFluxError('');
@@ -112,7 +113,7 @@ export default function NewCampaign() {
         setGeneratingImages(false);
       });
     }
-  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, productPhotoUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runAnalysis = async () => {
     if (!form.name.trim() && !form.desc.trim()) return;
@@ -144,7 +145,10 @@ export default function NewCampaign() {
 
   const goToCreatives = () => {
     if (!strategy) return;
-    setStep(3); // useEffect handles generation
+    // Capture photo URL NOW, before changing step — avoids stale closure in useEffect
+    const photoUrl = extraFiles[0]?.preview || mainFiles[0]?.preview || null;
+    setProductPhotoUrl(photoUrl);
+    setStep(3);
   };
 
   const displayStrategy = strategy ?? {

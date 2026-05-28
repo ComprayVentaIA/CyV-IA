@@ -83,6 +83,7 @@ export class AiService {
     const objective = this.sanitize(input.objective, 50);
 
     const prompt = `Sos un experto en publicidad digital de Meta Ads para el mercado latinoamericano.
+IMPORTANTE: Escribí TODO en español correcto, sin errores de ortografía ni palabras inventadas.
 Analizá este producto y generá una estrategia de campaña completa.
 
 Producto: ${productName}
