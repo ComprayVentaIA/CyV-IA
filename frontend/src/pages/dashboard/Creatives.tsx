@@ -1,62 +1,11 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { Tag, Spinner, Toggle } from '../../components/ui';
 import { aiApi } from '../../api/ai';
 import api from '../../api/client';
 import { C } from '../../styles/theme';
 import type { Creative } from '../../types';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
-
-const HF_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
-const HF_KEY = import.meta.env.VITE_HF_API_KEY as string | undefined;
-
-const FORMAT_PX: Record<'9:16' | '4:5' | '1:1', [number, number]> = {
-  '9:16': [576, 1024],
-  '4:5': [640, 800],
-  '1:1': [1024, 1024],
-};
-
-const STYLE_DESC: Record<string, string> = {
-  'Hook urgencia':   'luxury product advertisement, dramatic cinematic lighting, dark moody background, ultra realistic, 8k',
-  'Oferta limitada': 'vibrant sale advertisement, bold colors, product hero shot, commercial photography, high energy',
-  'Unboxing':        'product unboxing photography, lifestyle setting, warm natural lighting, e-commerce style',
-  'Comparativa':     'clean product comparison, studio photography, white background, professional product shot',
-  'Testimonial':     'lifestyle product photography, happy person using product, bright natural environment, authentic',
-  'Producto hero':   'luxury hero product shot, dramatic studio lighting, dark background, ultra detailed, cinematic',
-};
-
-async function generateFluxImage(product: string, style: string, format: '9:16' | '4:5' | '1:1', hook?: string): Promise<string> {
-  if (!HF_KEY) throw new Error('VITE_HF_API_KEY no está configurado en Vercel');
-  const styleDesc = STYLE_DESC[style] ?? 'professional product advertisement, high quality';
-  const prompt = `${product}${hook ? `, "${hook}" text concept` : ''}, ${styleDesc}, Meta Ads creative, photorealistic, no text overlay, no watermark`;
-  const [width, height] = FORMAT_PX[format];
-  try {
-    const res = await axios.post(HF_URL, { inputs: prompt }, {
-      headers: {
-        Authorization: `Bearer ${HF_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'image/png',
-        'x-wait-for-model': 'true',
-      },
-      responseType: 'blob',
-      timeout: 120_000,
-    });
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(res.data as Blob);
-    });
-  } catch (err: any) {
-    // Intentar leer el cuerpo del error de HuggingFace
-    if (err?.response?.data instanceof Blob) {
-      const text = await err.response.data.text();
-      throw new Error(`HF ${err.response.status}: ${text.slice(0, 200)}`);
-    }
-    throw err;
-  }
-  void width; void height; // usados en futuras versiones con parámetros
-}
+import { generateFluxImage } from '../../utils/fluxImage';
 
 const AVATARS = [
   { id: 'a1', name: 'Sofía', style: 'Presentadora', emoji: '👩', bg: 'linear-gradient(135deg,#1a0a2e,#2d1555)' },

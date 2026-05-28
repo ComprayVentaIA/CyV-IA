@@ -4,6 +4,7 @@ import FileUploadZone, { type UploadFile } from '../../components/ui/FileUploadZ
 import { uploadsApi } from '../../api/uploads';
 import { aiApi } from '../../api/ai';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
+import { generateFluxImage } from '../../utils/fluxImage';
 import { C } from '../../styles/theme';
 
 const STEPS = ['Producto', 'IA analiza', 'Creativos', 'Publicar'];
@@ -57,35 +58,38 @@ export default function NewCampaign() {
   const [mainFiles, setMainFiles] = useState<UploadFile[]>([]);
   const [extraFiles, setExtraFiles] = useState<UploadFile[]>([]);
 
-  // Canvas-generated creatives
   const [creativeImages, setCreativeImages] = useState<string[]>([]);
+  const [generatingImages, setGeneratingImages] = useState(false);
 
   const handleUpload = useCallback(async (files: File[], onProgress: (pct: number) => void) => {
     const res = await uploadsApi.upload(files, onProgress);
     return (res.data as any)?.data?.files ?? [];
   }, []);
 
-  // Generate canvas images whenever we enter step 3 and have a strategy
+  // Generate AI images when entering step 3
   useEffect(() => {
     if (step !== 3 || !strategy) return;
-    try {
-      const hook = strategy.hook || form.name || 'Oferta especial';
-      const product = form.name || 'Producto';
-      const images = CREATIVE_CONFIGS.map(cfg =>
-        generateCreativeImage({
-          hook,
-          product,
-          format: cfg.fmt,
-          style: strategy.styleNotes ?? 'Hook urgencia',
-          avatarEmoji: cfg.emoji,
-          gradientFrom: cfg.from,
-          gradientTo: cfg.to,
-        })
-      );
+    const hook = strategy.hook || form.name || 'Oferta especial';
+    const product = form.name || 'Producto';
+    const style = strategy.styleNotes ?? 'Hook urgencia';
+
+    // Show canvas immediately as placeholder
+    setCreativeImages(CREATIVE_CONFIGS.map(cfg =>
+      generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to })
+    ));
+
+    // Replace with real FLUX.1 images async
+    setGeneratingImages(true);
+    Promise.all(
+      CREATIVE_CONFIGS.map(cfg =>
+        generateFluxImage(product, style, cfg.fmt, hook).catch(() =>
+          generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to })
+        )
+      )
+    ).then(images => {
       setCreativeImages(images);
-    } catch {
-      setCreativeImages([]);
-    }
+      setGeneratingImages(false);
+    });
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runAnalysis = async () => {
@@ -118,26 +122,7 @@ export default function NewCampaign() {
 
   const goToCreatives = () => {
     if (!strategy) return;
-    // Explicitly generate images (also covered by useEffect but this is faster)
-    try {
-      const hook = strategy.hook || form.name || 'Oferta especial';
-      const product = form.name || 'Producto';
-      const images = CREATIVE_CONFIGS.map(cfg =>
-        generateCreativeImage({
-          hook,
-          product,
-          format: cfg.fmt,
-          style: strategy.styleNotes ?? 'Hook urgencia',
-          avatarEmoji: cfg.emoji,
-          gradientFrom: cfg.from,
-          gradientTo: cfg.to,
-        })
-      );
-      setCreativeImages(images);
-    } catch {
-      setCreativeImages([]);
-    }
-    setStep(3);
+    setStep(3); // useEffect handles generation
   };
 
   const displayStrategy = strategy ?? {
@@ -372,6 +357,11 @@ export default function NewCampaign() {
           <div>
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Creativos generados por IA</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+              {generatingImages && (
+                <div style={{ gridColumn: '1/-1', background: C.accentDim, border: `1px solid ${C.accent}44`, borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.accent }}>
+                  <Spinner size={12} /> Generando imágenes reales con FLUX.1-schnell... (20-30s)
+                </div>
+              )}
               {CREATIVE_CONFIGS.map((cfg, i) => (
                 <div key={i} style={{ background: C.surface, border: `1.5px solid ${i === 0 ? C.accent : C.border}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = C.accent)}
