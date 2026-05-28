@@ -24,12 +24,14 @@ export async function generateFluxImage(
   style: string,
   format: '9:16' | '4:5' | '1:1',
   hook?: string,
+  description?: string,
 ): Promise<string> {
   const hfKey = import.meta.env.VITE_HF_API_KEY as string | undefined;
   if (!hfKey) throw new Error('VITE_HF_API_KEY no está configurado en Vercel');
 
   const styleDesc = STYLE_DESC[style] ?? 'professional product advertisement, high quality';
-  const prompt = `${product}${hook ? `, "${hook}" text concept` : ''}, ${styleDesc}, Meta Ads creative, photorealistic, no text overlay, no watermark`;
+  const descPart = description ? `, ${description}` : '';
+  const prompt = `commercial product photography of "${product}"${descPart}, ${styleDesc}, studio lighting, sharp focus, e-commerce advertisement, photorealistic, no text, no watermark, clean background`;
 
   const [width, height] = FORMAT_PX[format];
 

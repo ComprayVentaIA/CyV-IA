@@ -82,9 +82,10 @@ export default function NewCampaign() {
     // Replace with real FLUX.1 images async
     setGeneratingImages(true);
     setFluxError('');
+    const description = form.desc || undefined;
     Promise.all(
       CREATIVE_CONFIGS.map(cfg =>
-        generateFluxImage(product, style, cfg.fmt, hook).catch((err: any) => {
+        generateFluxImage(product, style, cfg.fmt, hook, description).catch((err: any) => {
           const msg = err?.message ?? String(err);
           setFluxError(msg);
           return generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to });
