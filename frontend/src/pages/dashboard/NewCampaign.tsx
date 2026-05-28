@@ -4,7 +4,7 @@ import FileUploadZone, { type UploadFile } from '../../components/ui/FileUploadZ
 import { uploadsApi } from '../../api/uploads';
 import { aiApi } from '../../api/ai';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
-import { generateFluxImage } from '../../utils/fluxImage';
+import { generateDalleImage } from '../../utils/dalleImage';
 import { C } from '../../styles/theme';
 
 const STEPS = ['Producto', 'IA analiza', 'Creativos', 'Publicar'];
@@ -102,7 +102,7 @@ export default function NewCampaign() {
       const description = form.desc || undefined;
       Promise.all(
         CREATIVE_CONFIGS.map(cfg =>
-          generateFluxImage(product, style, cfg.fmt, hook, description).catch((err: any) => {
+          generateDalleImage(product, style, cfg.fmt, hook, description).catch((err: any) => {
             const msg = err?.message ?? String(err);
             setFluxError(msg);
             return generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to });

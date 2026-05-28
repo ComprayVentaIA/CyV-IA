@@ -5,7 +5,7 @@ import api from '../../api/client';
 import { C } from '../../styles/theme';
 import type { Creative } from '../../types';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
-import { generateFluxImage } from '../../utils/fluxImage';
+import { generateDalleImage } from '../../utils/dalleImage';
 
 const AVATARS = [
   { id: 'a1', name: 'Sofía', style: 'Presentadora', emoji: '👩', bg: 'linear-gradient(135deg,#1a0a2e,#2d1555)' },
@@ -134,7 +134,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
 
     let imageUrl: string;
     try {
-      imageUrl = await generateFluxImage(product, tpl.name, fmt, activeHook || undefined);
+      imageUrl = await generateDalleImage(product, tpl.name, fmt, activeHook || undefined);
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       setGenError(`IA: ${msg.slice(0, 120)}`);
