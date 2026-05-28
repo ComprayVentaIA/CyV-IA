@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Anthropic from '@anthropic-ai/sdk';
+import axios from 'axios';
 
-// Patterns that could indicate prompt injection attempts
 const INJECTION_PATTERNS = [
   /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+instructions/i,
   /system\s*prompt/i,
@@ -14,44 +13,60 @@ const INJECTION_PATTERNS = [
 ];
 
 const MAX_FIELD_LENGTH = 500;
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const MODEL_FAST = 'llama-3.1-8b-instant';
+const MODEL_SMART = 'llama-3.3-70b-versatile';
 
 @Injectable()
 export class AiService {
-  private readonly anthropic: Anthropic | null = null;
+  private readonly apiKey: string;
+  private readonly enabled: boolean;
   private readonly logger = new Logger(AiService.name);
 
   constructor(private readonly config: ConfigService) {
-    const apiKey = this.config.get<string>('anthropic.apiKey') || process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      this.anthropic = new Anthropic({ apiKey });
-      this.logger.log('🤖 AiService initialized');
+    this.apiKey = this.config.get<string>('groq.apiKey') || process.env.GROQ_API_KEY || '';
+    this.enabled = !!this.apiKey;
+    if (!this.enabled) {
+      this.logger.warn('⚠️  GROQ_API_KEY not set — AI features disabled');
     } else {
-      this.logger.warn('⚠️  ANTHROPIC_API_KEY not set — AI features disabled (degraded mode)');
+      this.logger.log('🤖 AiService initialized with Groq (Llama 3)');
     }
   }
 
-  private get client(): Anthropic {
-    if (!this.anthropic) throw new Error('IA no disponible — configurá ANTHROPIC_API_KEY en las variables de entorno');
-    return this.anthropic;
+  private ensureEnabled() {
+    if (!this.enabled) throw new Error('IA no disponible — configurá GROQ_API_KEY en Railway → Variables');
   }
 
-  // Sanitizes user input before interpolation into AI prompts
   private sanitize(input: string, maxLength = MAX_FIELD_LENGTH): string {
     if (!input || typeof input !== 'string') return '';
-
     const trimmed = input.trim().slice(0, maxLength);
-
     for (const pattern of INJECTION_PATTERNS) {
       if (pattern.test(trimmed)) {
-        this.logger.warn(`Possible prompt injection attempt detected: "${trimmed.slice(0, 80)}"`);
+        this.logger.warn(`Possible prompt injection attempt: "${trimmed.slice(0, 80)}"`);
         throw new Error('El contenido ingresado contiene texto no permitido');
       }
     }
+    return trimmed.replace(/`/g, "'").replace(/\n{3,}/g, '\n\n');
+  }
 
-    // Escape characters that could break prompt structure
-    return trimmed
-      .replace(/`/g, "'")
-      .replace(/\n{3,}/g, '\n\n'); // collapse excessive newlines
+  private async chat(model: string, prompt: string, maxTokens = 1000): Promise<string> {
+    this.ensureEnabled();
+    const res = await axios.post(
+      GROQ_URL,
+      {
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30_000,
+      },
+    );
+    return res.data.choices[0].message.content.trim();
   }
 
   // ── Analyze product and generate campaign strategy ────────────────────────
@@ -85,25 +100,19 @@ Generá una estrategia completa en JSON con esta estructura exacta:
     "description": "descripción del público ideal",
     "age_min": 18,
     "age_max": 45,
-    "genders": ["all"|"male"|"female"],
+    "genders": ["all"],
     "interests": ["interés1", "interés2", "interés3"]
   },
-  "format": "9_16"|"1_1"|"4_5",
+  "format": "9_16",
   "styleNotes": "notas sobre estilo visual y edición recomendados",
   "whatsappMessage": "mensaje inicial automático cuando el lead hace click",
   "hooks_variants": ["hook alternativo 1", "hook alternativo 2"],
   "reasoning": "breve explicación de la estrategia"
 }
 
-Respondé SOLO con el JSON válido, sin texto adicional.`;
+Respondé SOLO con el JSON válido, sin texto adicional ni bloques de código.`;
 
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const raw = (response.content[0] as any).text;
+    const raw = await this.chat(MODEL_SMART, prompt, 1000);
     try {
       return JSON.parse(raw.replace(/```json|```/g, '').trim());
     } catch {
@@ -123,23 +132,17 @@ ${JSON.stringify(campaignsData, null, 2)}
 Generá un array JSON de insights con esta estructura:
 [
   {
-    "type": "scale"|"pause"|"optimize"|"info"|"warning",
+    "type": "scale",
     "title": "título corto del insight",
     "detail": "explicación concreta con números",
     "action": "acción recomendada específica",
-    "priority": "high"|"medium"|"low"
+    "priority": "high"
   }
 ]
 
-Máximo 6 insights. Ordenalos por prioridad. SOLO JSON, sin texto adicional.`;
+Máximo 6 insights. Ordenalos por prioridad. SOLO JSON válido, sin texto adicional ni bloques de código.`;
 
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const raw = (response.content[0] as any).text;
+    const raw = await this.chat(MODEL_SMART, prompt, 1000);
     try {
       return JSON.parse(raw.replace(/```json|```/g, '').trim());
     } catch {
@@ -156,29 +159,23 @@ Campaña: ${JSON.stringify(campaign, null, 2)}
 
 Generá sugerencias en JSON:
 {
-  "score": 0-100,
-  "status": "good"|"needs_work"|"critical",
+  "score": 75,
+  "status": "needs_work",
   "suggestions": [
     {
-      "type": "budget"|"creative"|"audience"|"copy"|"schedule",
+      "type": "budget",
       "title": "título corto",
       "description": "descripción concreta",
-      "expected_improvement": "mejora estimada en %"
+      "expected_improvement": "15%"
     }
   ],
   "new_hook": "nuevo hook sugerido si el CTR es bajo",
   "audience_tweak": "ajuste de audiencia sugerido"
 }
 
-SOLO JSON.`;
+SOLO JSON válido, sin texto adicional ni bloques de código.`;
 
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const raw = (response.content[0] as any).text;
+    const raw = await this.chat(MODEL_SMART, prompt, 800);
     try {
       return JSON.parse(raw.replace(/```json|```/g, '').trim());
     } catch {
@@ -193,12 +190,7 @@ SOLO JSON.`;
     const safeStyle = this.sanitize(style, 100);
     const safeFormat = this.sanitize(format, 10);
 
-    const response = await this.client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{
-        role: 'user',
-        content: `Sos un experto en publicidad viral de Meta Ads para el mercado latinoamericano.
+    const prompt = `Sos un experto en publicidad viral de Meta Ads para el mercado latinoamericano.
 Generá un script corto para un video publicitario de ${safeFormat}.
 
 Producto: ${safeProduct}
@@ -212,11 +204,9 @@ El script debe:
 - Terminar con CTA para WhatsApp
 - Estar en español rioplatense
 
-Respondé SOLO con el script, sin etiquetas ni explicaciones.`,
-      }],
-    });
+Respondé SOLO con el script, sin etiquetas ni explicaciones.`;
 
-    const text = (response.content[0] as any).text.trim();
+    const text = await this.chat(MODEL_FAST, prompt, 400);
     return { text };
   }
 
@@ -237,36 +227,27 @@ Respondé SOLO con el script, sin etiquetas ni explicaciones.`,
     }
 
     const contentBlock = isUrl
-      ? `URL de contenido de ${detectedPlatform}: ${safeContent}
-
-No podés acceder a la URL, pero basándote en el tipo de plataforma, generá un patrón viral típico de alto rendimiento para esa plataforma en el mercado latinoamericano.`
+      ? `URL de contenido de ${detectedPlatform}: ${safeContent}\n\nNo podés acceder a la URL, pero basándote en el tipo de plataforma, generá un patrón viral típico de alto rendimiento para esa plataforma en el mercado latinoamericano.`
       : `Contenido del anuncio:\n${safeContent}${sourceUrl ? `\n\nURL fuente: ${sourceUrl}` : ''}`;
 
-    const response = await this.client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{
-        role: 'user',
-        content: `Sos experto en publicidad viral de Meta Ads para el mercado latinoamericano. Analizá el siguiente contenido y extraé los patrones clave en JSON.
+    const prompt = `Sos experto en publicidad viral de Meta Ads para el mercado latinoamericano. Analizá el siguiente contenido y extraé los patrones clave en JSON.
 
 ${contentBlock}
 
-Respondé SOLO con este JSON válido (sin texto adicional):
+Respondé SOLO con este JSON válido (sin texto adicional ni bloques de código):
 {
   "hook": "el gancho principal en español rioplatense (máx 80 chars)",
-  "style": "estilo visual (ej: texto grande + transición rápida, UGC, producto en mano)",
-  "platform": "reels|stories|feed|tiktok|youtube",
-  "tone": "tono (urgencia|humor|emocional|inspiracional|escasez|oferta)",
+  "style": "estilo visual",
+  "platform": "reels",
+  "tone": "urgencia",
   "visualNotes": "notas sobre edición o visual recomendado",
-  "cta": "llamada a la acción (ej: Escribinos por WhatsApp)",
-  "audience": "audiencia objetivo (ej: Mujeres 22-38, moda)",
-  "score": número entre 65 y 95 según potencial viral,
-  "type": "video|image|carousel"
-}`,
-      }],
-    });
+  "cta": "llamada a la acción",
+  "audience": "audiencia objetivo",
+  "score": 80,
+  "type": "video"
+}`;
 
-    const raw = (response.content[0] as any).text;
+    const raw = await this.chat(MODEL_FAST, prompt, 400);
     try {
       return JSON.parse(raw.replace(/```json|```/g, '').trim());
     } catch {
@@ -282,20 +263,13 @@ Respondé SOLO con este JSON válido (sin texto adicional):
     const safeStyle = this.sanitize(style, 100);
     const safeFormat = this.sanitize(format, 10);
 
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: `Generá un prompt para DALL-E para crear una imagen publicitaria de Meta Ads.
+    const prompt = `Generá un prompt para crear una imagen publicitaria de Meta Ads.
 Producto: ${safeProduct}
 Estilo: ${safeStyle}
 Formato: ${safeFormat}
 El prompt debe ser en inglés, fotorrealista, con buena iluminación y estética premium.
-SOLO el prompt, sin explicaciones.`,
-      }],
-    });
+SOLO el prompt, sin explicaciones.`;
 
-    return (response.content[0] as any).text.trim();
+    return this.chat(MODEL_FAST, prompt, 300);
   }
 }

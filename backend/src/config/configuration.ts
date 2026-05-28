@@ -60,6 +60,10 @@ export default () => ({
     apiKey: process.env.ANTHROPIC_API_KEY ?? '',
   },
 
+  groq: {
+    apiKey: process.env.GROQ_API_KEY ?? '',
+  },
+
   huggingface: {
     apiKey: process.env.HUGGINGFACE_API_KEY ?? '',
   },
