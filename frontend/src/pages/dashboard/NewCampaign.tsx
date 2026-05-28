@@ -74,27 +74,44 @@ export default function NewCampaign() {
     const product = form.name || 'Producto';
     const style = strategy.styleNotes ?? 'Hook urgencia';
 
-    // Show canvas immediately as placeholder
-    setCreativeImages(CREATIVE_CONFIGS.map(cfg =>
-      generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to })
-    ));
+    // Detect uploaded product photo (use local blob URL — no upload needed)
+    const uploadedPhotoUrl = extraFiles[0]?.preview || mainFiles[0]?.preview || null;
 
-    // Replace with real FLUX.1 images async
     setGeneratingImages(true);
     setFluxError('');
-    const description = form.desc || undefined;
-    Promise.all(
-      CREATIVE_CONFIGS.map(cfg =>
-        generateFluxImage(product, style, cfg.fmt, hook, description).catch((err: any) => {
-          const msg = err?.message ?? String(err);
-          setFluxError(msg);
-          return generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to });
-        })
-      )
-    ).then(images => {
-      setCreativeImages(images);
-      setGeneratingImages(false);
-    });
+
+    if (uploadedPhotoUrl) {
+      // Use the uploaded photo as background — no API call needed
+      Promise.all(
+        CREATIVE_CONFIGS.map(cfg =>
+          generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to, backgroundImageUrl: uploadedPhotoUrl })
+        )
+      ).then(images => {
+        setCreativeImages(images);
+        setGeneratingImages(false);
+      });
+    } else {
+      // No photo uploaded — show canvas placeholder then replace with FLUX.1
+      Promise.all(
+        CREATIVE_CONFIGS.map(cfg =>
+          generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to })
+        )
+      ).then(placeholders => setCreativeImages(placeholders));
+
+      const description = form.desc || undefined;
+      Promise.all(
+        CREATIVE_CONFIGS.map(cfg =>
+          generateFluxImage(product, style, cfg.fmt, hook, description).catch((err: any) => {
+            const msg = err?.message ?? String(err);
+            setFluxError(msg);
+            return generateCreativeImage({ hook, product, format: cfg.fmt, style, avatarEmoji: cfg.emoji, gradientFrom: cfg.from, gradientTo: cfg.to });
+          })
+        )
+      ).then(images => {
+        setCreativeImages(images);
+        setGeneratingImages(false);
+      });
+    }
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runAnalysis = async () => {

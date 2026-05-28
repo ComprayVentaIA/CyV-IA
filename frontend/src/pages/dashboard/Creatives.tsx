@@ -68,7 +68,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
 
   const refreshPreview = (hookText: string, productText: string, tplObj = tpl, avObj = av, fmtStr = fmt) => {
     if (!hookText.trim() && !productText.trim()) return;
-    const img = generateCreativeImage({
+    generateCreativeImage({
       hook: hookText || 'Tu hook aquí',
       product: productText || 'Producto',
       format: fmtStr,
@@ -76,8 +76,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
       avatarEmoji: avObj.emoji,
       gradientFrom: tplObj.from,
       gradientTo: tplObj.to,
-    });
-    setPreviewImg(img);
+    }).then(img => setPreviewImg(img));
   };
 
   // Wraps any promise with a timeout — resolves/rejects whichever comes first
@@ -139,7 +138,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       setGenError(`IA: ${msg.slice(0, 120)}`);
-      imageUrl = generateCreativeImage({
+      imageUrl = await generateCreativeImage({
         hook: activeHook || product,
         product,
         format: fmt,
