@@ -10,8 +10,17 @@ export const aiApi = {
   analyzeCampaign: (productName: string, description: string, objective: string) =>
     api.post('/ai/analyze-campaign', { productName, description, objective }),
 
-  generateCreative: (product: string, style: string, format: '9:16' | '4:5' | '1:1', hook?: string) =>
-    api.post<{ data: { imageBase64: string } }>('/generative/image', { product, style, format, hook }, { timeout: 90_000 }),
+  // Claude analyzes product photo + generates optimized prompt for OpenAI Images
+  buildImagePrompt: (body: {
+    product: string;
+    style?: string;
+    format?: '9:16' | '4:5' | '1:1';
+    hook?: string;
+    description?: string;
+    imageBase64?: string;
+    mimeType?: string;
+  }) =>
+    api.post<{ data: { prompt: string } }>('/generative/image-prompt', body, { timeout: 30_000 }),
 
   generateVideo: (imageBase64: string, format: '9:16' | '4:5' | '1:1', movement: 'zoom_in' | 'zoom_out' | 'pan_right' | 'pan_left') =>
     api.post<{ data: { videoBase64: string } }>('/generative/video', { imageBase64, format, movement }, { timeout: 120_000 }),
