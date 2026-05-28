@@ -380,54 +380,95 @@ export default function NewCampaign() {
           </div>
 
           {/* Right: Generated creatives */}
-          <div>
-            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>Creativos generados por IA</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-              {generatingImages && (
-                <div style={{ gridColumn: '1/-1', background: C.accentDim, border: `1px solid ${C.accent}44`, borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.accent }}>
-                  <Spinner size={12} /> Generando imágenes reales con FLUX.1-schnell... (20-30s)
+          {(() => {
+            // Read photo directly from file state — always up-to-date, no closure issues
+            const photoUrl = extraFiles[0]?.preview || mainFiles[0]?.preview || null;
+            const hook = strategy?.hook || form.name || 'Oferta especial';
+            const product = form.name || 'Producto';
+
+            return (
+              <div>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 600, marginBottom: 13 }}>
+                  Creativos generados por IA
+                  {photoUrl && <span style={{ fontSize: 10, color: C.green, marginLeft: 8, fontFamily: "'DM Mono',monospace" }}>✓ usando tu foto</span>}
                 </div>
-              )}
-              {fluxError && !generatingImages && (
-                <div style={{ gridColumn: '1/-1', background: '#2a1500', border: '1px solid #f97316', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#f97316', wordBreak: 'break-all' }}>
-                  ⚠️ FLUX: {fluxError}
-                </div>
-              )}
-              {CREATIVE_CONFIGS.map((cfg, i) => (
-                <div key={i} style={{ background: C.surface, border: `1.5px solid ${i === 0 ? C.accent : C.border}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = C.accent)}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = i === 0 ? C.accent : C.border)}>
-                  <div style={{
-                    aspectRatio: cfg.fmt === '9:16' ? '9/16' : cfg.fmt === '4:5' ? '4/5' : '1',
-                    position: 'relative', overflow: 'hidden',
-                    background: `linear-gradient(135deg,${cfg.from},${cfg.to})`,
-                  }}>
-                    {cfg.best && (
-                      <div style={{ position: 'absolute', top: 8, right: 8, background: C.accent, color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, zIndex: 2 }}>★ Rec.</div>
-                    )}
-                    {creativeImages[i] ? (
-                      <img src={creativeImages[i]} alt={cfg.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
-                        <Spinner size={16} />
-                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'rgba(255,255,255,.4)' }}>{cfg.fmt}</div>
+
+                {!photoUrl && generatingImages && (
+                  <div style={{ background: C.accentDim, border: `1px solid ${C.accent}44`, borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.accent, marginBottom: 10 }}>
+                    <Spinner size={12} /> Generando imágenes con FLUX.1-schnell... (20-30s)
+                  </div>
+                )}
+                {!photoUrl && fluxError && !generatingImages && (
+                  <div style={{ background: '#2a1500', border: '1px solid #f97316', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#f97316', wordBreak: 'break-all', marginBottom: 10 }}>
+                    ⚠️ FLUX: {fluxError}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                  {CREATIVE_CONFIGS.map((cfg, i) => (
+                    <div key={i} style={{ background: C.surface, border: `1.5px solid ${i === 0 ? C.accent : C.border}`, borderRadius: 10, overflow: 'hidden', transition: 'all .2s' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = C.accent)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = i === 0 ? C.accent : C.border)}>
+
+                      <div style={{
+                        aspectRatio: cfg.fmt === '9:16' ? '9/16' : cfg.fmt === '4:5' ? '4/5' : '1',
+                        position: 'relative', overflow: 'hidden',
+                        background: `linear-gradient(135deg,${cfg.from},${cfg.to})`,
+                      }}>
+                        {cfg.best && (
+                          <div style={{ position: 'absolute', top: 8, right: 8, background: C.accent, color: '#fff', fontSize: 9, padding: '2px 7px', borderRadius: 4, zIndex: 10 }}>★ Rec.</div>
+                        )}
+
+                        {photoUrl ? (
+                          /* ── CSS overlay creative using uploaded photo ── */
+                          <>
+                            <img src={photoUrl} alt="producto" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            {/* Dark gradient for text readability */}
+                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 35%, rgba(0,0,0,0.75) 65%, rgba(0,0,0,0.95) 100%)' }} />
+                            {/* Top branding bar */}
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'rgba(0,0,0,0.5)' }}>
+                              <span style={{ color: '#fff', fontSize: 8, fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>CONVERSIA ADS</span>
+                              <span style={{ color: '#7c5cfc', fontSize: 8, fontFamily: "'DM Mono',monospace" }}>IA</span>
+                            </div>
+                            {/* Hook text */}
+                            <div style={{ position: 'absolute', bottom: 40, left: 8, right: 8, textAlign: 'center' }}>
+                              <div style={{ color: '#fff', fontWeight: 800, fontSize: cfg.fmt === '9:16' ? 17 : 13, lineHeight: 1.2, textShadow: '0 2px 10px rgba(0,0,0,0.9)', textTransform: 'uppercase', marginBottom: 4 }}>
+                                {hook.slice(0, 60)}
+                              </div>
+                              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, fontFamily: "'DM Mono',monospace" }}>{product}</div>
+                            </div>
+                            {/* WhatsApp CTA */}
+                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(90deg,#25d366,#1a9e4f)', padding: '6px 4px', textAlign: 'center', color: '#fff', fontSize: 9, fontWeight: 700 }}>
+                              💬 Escribinos por WhatsApp
+                            </div>
+                          </>
+                        ) : creativeImages[i] ? (
+                          /* ── FLUX.1 or canvas generated image ── */
+                          <img src={creativeImages[i]} alt={cfg.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
+                            <Spinner size={16} />
+                            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'rgba(255,255,255,.4)' }}>{cfg.fmt}</div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div style={{ padding: '8px 10px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 2 }}>{cfg.label}</div>
-                    <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "'DM Mono',monospace", marginBottom: 7 }}>{cfg.fmt}</div>
-                    {creativeImages[i] && (
-                      <a href={creativeImages[i]} download={`creativo-${cfg.fmt.replace(':', '-')}.jpg`}
-                        style={{ display: 'block', textAlign: 'center', fontSize: 10, padding: '4px', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMuted, textDecoration: 'none', background: C.bg }}>
-                        📥 Descargar
-                      </a>
-                    )}
-                  </div>
+
+                      <div style={{ padding: '8px 10px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 2 }}>{cfg.label}</div>
+                        <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "'DM Mono',monospace", marginBottom: 7 }}>{cfg.fmt}</div>
+                        {(photoUrl || creativeImages[i]) && (
+                          <a href={photoUrl || creativeImages[i]} download={`creativo-${cfg.fmt.replace(':', '-')}.jpg`}
+                            style={{ display: 'block', textAlign: 'center', fontSize: 10, padding: '4px', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMuted, textDecoration: 'none', background: C.bg }}>
+                            📥 Descargar
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
