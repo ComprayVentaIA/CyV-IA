@@ -32,7 +32,12 @@ async function generateFluxImage(product: string, style: string, format: '9:16' 
   const [width, height] = FORMAT_PX[format];
   try {
     const res = await axios.post(HF_URL, { inputs: prompt }, {
-      headers: { Authorization: `Bearer ${HF_KEY}`, 'x-wait-for-model': 'true' },
+      headers: {
+        Authorization: `Bearer ${HF_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'image/png',
+        'x-wait-for-model': 'true',
+      },
       responseType: 'blob',
       timeout: 120_000,
     });
