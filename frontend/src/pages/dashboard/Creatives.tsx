@@ -7,7 +7,7 @@ import { C } from '../../styles/theme';
 import type { Creative } from '../../types';
 import { generateCreativeImage } from '../../utils/creativeCanvas';
 
-const HF_URL = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell';
+const HF_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
 const HF_KEY = import.meta.env.VITE_HF_API_KEY as string | undefined;
 
 const FORMAT_PX: Record<'9:16' | '4:5' | '1:1', [number, number]> = {
@@ -98,6 +98,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
   const [videoBase64, setVideoBase64] = useState<string | null>(null);
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [movement, setMovement] = useState<'zoom_in' | 'zoom_out' | 'pan_right' | 'pan_left'>('zoom_in');
+  const [genError, setGenError] = useState<string | null>(null);
   const [subtitles, setSubtitles] = useState(true);
   const [ctaWa, setCtaWa] = useState(true);
 
@@ -143,7 +144,7 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
 
   const generate = async () => {
     if (!product.trim()) return;
-    setGenerating(true); setProgress(0); setDone(null); setVideoBase64(null);
+    setGenerating(true); setProgress(0); setDone(null); setVideoBase64(null); setGenError(null);
 
     let activeScript = script;
     let activeHook = hook || product;
@@ -174,8 +175,9 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
     let imageUrl: string;
     try {
       imageUrl = await generateFluxImage(product, tpl.name, fmt, activeHook || undefined);
-    } catch {
-      // Fallback canvas si HF falla (sin token, rate limit, etc.)
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      setGenError(`IA: ${msg.slice(0, 120)}`);
       imageUrl = generateCreativeImage({
         hook: activeHook || product,
         product,
@@ -302,6 +304,11 @@ function CreativeStudio({ onAttach, setCreatives }: { onAttach: (c: Creative) =>
             </div>
           )}
         </div>
+        {genError && !generating && (
+          <div style={{ background: '#2a0a0a', border: '1px solid #ff444444', borderRadius: 8, padding: '8px 12px', maxWidth: 260, width: '100%', fontSize: 10, color: '#ff8888', fontFamily: "'DM Mono',monospace", wordBreak: 'break-all' }}>
+            ⚠️ {genError}
+          </div>
+        )}
         {generating && (
           <div style={{ width: '100%', maxWidth: 240 }}>
             <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6, textAlign: 'center' }}>Generando… {progress}%</div>
