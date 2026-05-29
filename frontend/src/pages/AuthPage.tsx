@@ -1,26 +1,33 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Zap, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Spinner } from '../components/ui';
-import { C } from '../styles/theme';
 import type { Plan } from '../types';
 
-interface LocationState {
-  plan?: Plan;
-  tab?: 'login' | 'register';
-}
+interface LocationState { plan?: Plan; tab?: 'login' | 'register' }
+
+const FEATURES = [
+  'Campañas Meta Ads con IA',
+  'Generación de creativos automática',
+  'Insights en tiempo real',
+  'WhatsApp marketing integrado',
+  'Reportes diarios automatizados',
+];
 
 export default function AuthPage() {
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
   const { state: locState } = useLocation() as { state: LocationState | null };
-  const { login, register } = useAuth();
+  const { login, register }  = useAuth();
 
   const plan = locState?.plan ?? null;
-  const [tab, setTab] = useState<'login' | 'register'>(locState?.tab ?? 'login');
-  const [form, setForm] = useState({ email: '', password: '', name: '', confirm: '' });
+  const [tab,     setTab]     = useState<'login' | 'register'>(locState?.tab ?? 'login');
+  const [form,    setForm]    = useState({ email: '', password: '', name: '', confirm: '' });
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
-  const [ok, setOk] = useState('');
+  const [err,     setErr]     = useState('');
+  const [ok,      setOk]      = useState('');
+  const [showPwd, setShowPwd] = useState(false);
 
   const set = (k: string, v: string) => { setForm(p => ({ ...p, [k]: v })); setErr(''); };
 
@@ -33,9 +40,7 @@ export default function AuthPage() {
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setErr(msg ?? 'Email o contraseña incorrectos');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const doRegister = async () => {
@@ -53,63 +58,204 @@ export default function AuthPage() {
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setErr(msg ?? 'Error al registrar. Intentá nuevamente.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page" style={{ background: '#07070f' }}>
+      {/* Ambient gradient */}
       <div className="auth-bg" />
-      <button className="btn btn-g" style={{ position: 'fixed', top: 20, left: 20, fontSize: 12 }} onClick={() => navigate('/')}>← Volver</button>
-      <div className="auth-card fade-in">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 26 }}>
-          <div className="logo-icon" style={{ width: 34, height: 34, fontSize: 14 }}>C</div>
+      <div style={{ position: 'absolute', top: -200, right: -200, width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(#7c5cfc09, transparent 70%)', pointerEvents: 'none' }} />
+
+      {/* Back button */}
+      <button
+        onClick={() => navigate('/')}
+        className="fixed top-5 left-5 flex items-center gap-1.5 text-[12px] text-muted hover:text-text transition-colors bg-surface border border-border rounded-lg px-3 py-1.5 z-10"
+      >
+        <ArrowLeft size={13} />
+        Volver
+      </button>
+
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: .98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: .35, ease: [.4, 0, .2, 1] }}
+        className="auth-card"
+        style={{ maxWidth: 420, background: '#0f0f1a', border: '1.5px solid #1c1c2e', borderRadius: 20, padding: '32px 28px' }}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-center gap-2.5 mb-7">
+          <div className="w-9 h-9 rounded-xl bg-grad flex items-center justify-center shadow-glow">
+            <Zap size={16} className="text-white" />
+          </div>
           <div>
-            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14, letterSpacing: '.01em' }}>CONVERSIA</div>
-            <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "'DM Mono',monospace", letterSpacing: '.1em' }}>ADS SUITE</div>
+            <div className="font-syne font-extrabold text-[15px] text-text tracking-tight">CONVERSIA</div>
+            <div className="text-[9px] text-muted font-mono tracking-widest uppercase">ADS SUITE</div>
           </div>
         </div>
+
+        {/* Plan badge */}
         {plan && (
-          <div style={{ background: C.accentDim, border: `1px solid ${C.accent}33`, borderRadius: 9, padding: '9px 13px', marginBottom: 18, fontSize: 13 }}>
-            <span style={{ color: C.textMuted }}>Plan: </span>
-            <span style={{ color: C.accent, fontWeight: 600 }}>{plan.name} — ${plan.price}/mes</span>
-            <span style={{ color: C.green, marginLeft: 8, fontSize: 11 }}>7 días gratis</span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-5 bg-accent/10 border border-accent/25 rounded-xl p-3 text-[13px]"
+          >
+            <span className="text-muted">Plan: </span>
+            <span className="text-accent font-semibold">{plan.name} — ${plan.price}/mes</span>
+            <span className="text-green text-[11px] ml-2">· 7 días gratis</span>
+          </motion.div>
         )}
-        <div className="auth-tabs">
+
+        {/* Tabs */}
+        <div className="auth-tabs mb-5">
           {(['login', 'register'] as const).map(t => (
-            <button key={t} className={`auth-tab${tab === t ? ' active' : ''}`} onClick={() => { setTab(t); setErr(''); setOk(''); }}>
+            <button
+              key={t}
+              className={`auth-tab${tab === t ? ' active' : ''}`}
+              onClick={() => { setTab(t); setErr(''); setOk(''); }}
+            >
               {t === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
             </button>
           ))}
         </div>
-        {err && <div className="err-box">{err}</div>}
-        {ok && <div className="ok-box">{ok}</div>}
-        {tab === 'login' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-            <div className="fg"><label className="flbl">Email</label><input className="finput" type="email" placeholder="tu@email.com" value={form.email} onChange={e => set('email', e.target.value)} /></div>
-            <div className="fg"><label className="flbl">Contraseña</label><input className="finput" type="password" placeholder="••••••••" value={form.password} onChange={e => set('password', e.target.value)} onKeyDown={e => e.key === 'Enter' && doLogin()} /></div>
-            <div style={{ textAlign: 'right' }}><span style={{ color: C.accent, fontSize: 12, cursor: 'pointer' }}>¿Olvidaste tu contraseña?</span></div>
-            <button className="btn btn-p" style={{ width: '100%', padding: '11px' }} onClick={doLogin} disabled={loading}>
-              {loading ? <Spinner color="#fff" /> : 'Ingresar →'}
-            </button>
-            <div style={{ textAlign: 'center', fontSize: 12, color: C.textMuted }}>¿No tenés cuenta? <span style={{ color: C.accent, cursor: 'pointer' }} onClick={() => setTab('register')}>Registrate gratis</span></div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-            <div className="fg"><label className="flbl">Nombre completo</label><input className="finput" placeholder="Alan Ugarte" value={form.name} onChange={e => set('name', e.target.value)} /></div>
-            <div className="fg"><label className="flbl">Email</label><input className="finput" type="email" placeholder="tu@email.com" value={form.email} onChange={e => set('email', e.target.value)} /></div>
-            <div className="fg"><label className="flbl">Contraseña</label><input className="finput" type="password" placeholder="Mínimo 8 caracteres" value={form.password} onChange={e => set('password', e.target.value)} /></div>
-            <div className="fg"><label className="flbl">Confirmar contraseña</label><input className="finput" type="password" placeholder="••••••••" value={form.confirm} onChange={e => set('confirm', e.target.value)} onKeyDown={e => e.key === 'Enter' && doRegister()} /></div>
-            <button className="btn btn-p" style={{ width: '100%', padding: '11px' }} onClick={doRegister} disabled={loading}>
-              {loading ? <Spinner color="#fff" /> : plan ? 'Crear cuenta y pagar →' : 'Crear cuenta gratis →'}
-            </button>
-            <div style={{ fontSize: 11, color: C.textDim, textAlign: 'center' }}>Al registrarte aceptás los Términos y la Política de Privacidad</div>
-            <div style={{ textAlign: 'center', fontSize: 12, color: C.textMuted }}>¿Ya tenés cuenta? <span style={{ color: C.accent, cursor: 'pointer' }} onClick={() => setTab('login')}>Iniciá sesión</span></div>
-          </div>
+
+        {/* Heading */}
+        <div className="mb-5">
+          <h1 className="font-syne font-bold text-[18px] text-text leading-tight mb-1">
+            {tab === 'login' ? 'Bienvenido de vuelta' : 'Empezá gratis hoy'}
+          </h1>
+          <p className="text-[12px] text-muted">
+            {tab === 'login'
+              ? 'Ingresá a tu cuenta de Conversia ADS'
+              : 'Creá tu cuenta y gestioná tus campañas con IA'}
+          </p>
+        </div>
+
+        {/* Alerts */}
+        {err && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="err-box mb-4">
+            {err}
+          </motion.div>
         )}
-      </div>
+        {ok && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="ok-box mb-4 flex items-start gap-2">
+            <CheckCircle2 size={14} className="flex-shrink-0 mt-0.5" />
+            {ok}
+          </motion.div>
+        )}
+
+        {/* Form */}
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, x: tab === 'login' ? -10 : 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: .2 }}
+          className="flex flex-col gap-3.5"
+        >
+          {tab === 'register' && (
+            <div className="fg">
+              <label className="flbl">Nombre completo</label>
+              <input className="finput" placeholder="Alan García" value={form.name} onChange={e => set('name', e.target.value)} />
+            </div>
+          )}
+
+          <div className="fg">
+            <label className="flbl">Email</label>
+            <input className="finput" type="email" placeholder="tu@empresa.com" value={form.email} onChange={e => set('email', e.target.value)} />
+          </div>
+
+          <div className="fg">
+            <label className="flbl">Contraseña</label>
+            <div className="relative">
+              <input
+                className="finput"
+                type={showPwd ? 'text' : 'password'}
+                placeholder={tab === 'register' ? 'Mínimo 8 caracteres' : '••••••••'}
+                value={form.password}
+                onChange={e => set('password', e.target.value)}
+                onKeyDown={e => tab === 'login' && e.key === 'Enter' && doLogin()}
+                style={{ paddingRight: 40 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text transition-colors"
+              >
+                {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+
+          {tab === 'register' && (
+            <div className="fg">
+              <label className="flbl">Confirmar contraseña</label>
+              <input
+                className="finput"
+                type="password"
+                placeholder="••••••••"
+                value={form.confirm}
+                onChange={e => set('confirm', e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && doRegister()}
+              />
+            </div>
+          )}
+
+          {tab === 'login' && (
+            <div className="text-right">
+              <span className="text-[12px] text-accent cursor-pointer hover:opacity-80 transition-opacity">
+                ¿Olvidaste tu contraseña?
+              </span>
+            </div>
+          )}
+
+          <button
+            className="btn btn-p w-full justify-center"
+            style={{ padding: '11px', fontSize: 13, marginTop: 2 }}
+            onClick={tab === 'login' ? doLogin : doRegister}
+            disabled={loading}
+          >
+            {loading
+              ? <Spinner />
+              : tab === 'login'
+              ? 'Ingresar →'
+              : plan ? 'Crear cuenta y pagar →' : 'Crear cuenta gratis →'
+            }
+          </button>
+
+          <div className="text-center text-[12px] text-muted">
+            {tab === 'login' ? (
+              <>¿No tenés cuenta? <span className="text-accent cursor-pointer hover:opacity-80 transition-opacity" onClick={() => { setTab('register'); setErr(''); }}>Registrate gratis</span></>
+            ) : (
+              <>¿Ya tenés cuenta? <span className="text-accent cursor-pointer hover:opacity-80 transition-opacity" onClick={() => { setTab('login'); setErr(''); }}>Iniciá sesión</span></>
+            )}
+          </div>
+
+          {tab === 'register' && (
+            <div className="text-[11px] text-dim text-center">
+              Al registrarte aceptás los Términos de Servicio y la Política de Privacidad
+            </div>
+          )}
+        </motion.div>
+
+        {/* Feature list (register only) */}
+        {tab === 'register' && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .1 }}
+            className="mt-5 pt-5 border-t border-border"
+          >
+            <div className="text-[10px] text-muted font-mono uppercase tracking-wider mb-3">Incluido en tu cuenta</div>
+            <div className="flex flex-col gap-1.5">
+              {FEATURES.map(f => (
+                <div key={f} className="flex items-center gap-2 text-[12px] text-muted">
+                  <CheckCircle2 size={12} className="text-green flex-shrink-0" />
+                  {f}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 }

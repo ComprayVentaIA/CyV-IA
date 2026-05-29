@@ -23,7 +23,7 @@ export async function generateFluxImage(
   product: string,
   style: string,
   format: '9:16' | '4:5' | '1:1',
-  hook?: string,
+  _hook?: string,
   description?: string,
 ): Promise<string> {
   const hfKey = import.meta.env.VITE_HF_API_KEY as string | undefined;

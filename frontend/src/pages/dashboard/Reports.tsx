@@ -1,35 +1,61 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Tag, MiniChart, Spinner } from '../../components/ui';
-import { C } from '../../styles/theme';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  AreaChart, Area, BarChart, Bar, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+} from 'recharts';
+import {
+  TrendingUp, TrendingDown, Users, DollarSign,
+  Download, RefreshCw, Zap, ChevronRight, Brain,
+  BarChart3,
+} from 'lucide-react';
+import { Tag, Spinner } from '../../components/ui';
 import { reportsApi, type ReportRow } from '../../api/reports';
 import api from '../../api/client';
 
+/* ── Static data ──────────────────────────────────────────────────────────── */
+
 const MOCK_CAMPAIGNS = [
-  { id: 1, name: 'Zapatillas Nike Air - Reels', roas: '4.1x', leads: 82, ctr: '4.2%', spent: '$312' },
-  { id: 2, name: 'Bolsos importados - Stories', roas: '3.2x', leads: 38, ctr: '3.8%', spent: '$198' },
-  { id: 3, name: 'Ropa de invierno - Feed', roas: '1.2x', leads: 9, ctr: '1.9%', spent: '$87' },
+  { id: 1, name: 'Zapatillas Nike Air - Reels',  roas: '4.1x', leads: 82,  ctr: '4.2%', spent: '$312' },
+  { id: 2, name: 'Bolsos importados - Stories',  roas: '3.2x', leads: 38,  ctr: '3.8%', spent: '$198' },
+  { id: 3, name: 'Ropa de invierno - Feed',      roas: '1.2x', leads: 9,   ctr: '1.9%', spent: '$87'  },
   { id: 4, name: 'Tecnología gaming - Carrusel', roas: '5.8x', leads: 179, ctr: '5.1%', spent: '$520' },
-  { id: 5, name: 'Indumentaria deportiva', roas: '2.9x', leads: 55, ctr: '3.4%', spent: '$241' },
+  { id: 5, name: 'Indumentaria deportiva',       roas: '2.9x', leads: 55,  ctr: '3.4%', spent: '$241' },
 ];
 
-const INSIGHT_TYPE_ICON: Record<string, string> = { scale: '🚀', pause: '⏸️', optimize: '🎯', info: 'ℹ️', warning: '⚠️' };
-const INSIGHT_TYPE_TAG: Record<string, 'tg' | 'ta' | 'tb' | 'tr'> = { scale: 'tg', warning: 'ta', info: 'tb', optimize: 'tb', pause: 'tr' };
+const WEEKLY_DATA = [
+  { day: 'Lun', roas: 3.2, leads: 18, cpm: 4.8 },
+  { day: 'Mar', roas: 3.8, leads: 24, cpm: 4.5 },
+  { day: 'Mié', roas: 4.1, leads: 31, cpm: 4.2 },
+  { day: 'Jue', roas: 3.7, leads: 22, cpm: 4.0 },
+  { day: 'Vie', roas: 4.6, leads: 38, cpm: 4.1 },
+  { day: 'Sáb', roas: 5.1, leads: 45, cpm: 3.9 },
+  { day: 'Dom', roas: 4.8, leads: 40, cpm: 4.2 },
+];
 
-function generatePDF(campaignRows: typeof MOCK_CAMPAIGNS, aiInsights?: any[]) {
+const INSIGHT_TYPE_ICON: Record<string, string>             = { scale: '🚀', pause: '⏸️', optimize: '🎯', info: '💡', warning: '⚠️' };
+const INSIGHT_TYPE_TAG:  Record<string, 'tg'|'ta'|'tb'|'tr'> = { scale: 'tg', warning: 'ta', info: 'tb', optimize: 'tb', pause: 'tr' };
+
+const tooltipStyle = {
+  background: '#0f0f1a', border: '1px solid #1c1c2e',
+  borderRadius: 8, fontSize: 11, color: '#e8e8f4',
+  boxShadow: '0 8px 24px #00000066',
+};
+
+/* ── PDF generator (unchanged logic) ─────────────────────────────────────── */
+function generatePDF(rows: typeof MOCK_CAMPAIGNS, insights?: any[]) {
   const date = new Date().toLocaleDateString('es-AR');
-  const rows = campaignRows.map(c => `
+  const rowsHtml = rows.map(c => `
     <tr>
       <td>${c.name}</td>
       <td class="${parseFloat(c.roas) >= 3 ? 'green' : 'red'}">${c.roas}</td>
       <td>${c.ctr}</td><td>${c.spent}</td>
       <td class="purple">${c.leads}</td>
     </tr>`).join('');
-
-  const insightSection = aiInsights && aiInsights.length > 0 ? `
-    <h2>🤖 Insights generados por IA</h2>
-    <ul>${aiInsights.map(ins => `<li><strong>${ins.title ?? ins.t ?? ''}</strong>: ${ins.detail ?? ins.action ?? ''}</li>`).join('')}</ul>
+  const insightSection = insights?.length ? `
+    <h2>🤖 Insights IA</h2>
+    <ul>${insights.map(i => `<li><strong>${i.title ?? i.t ?? ''}</strong>: ${i.detail ?? i.action ?? ''}</li>`).join('')}</ul>
   ` : '';
-
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe — ${date}</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1a1a2e;padding:40px}
 .header{background:linear-gradient(135deg,#7c5cfc,#4da6ff);color:#fff;padding:28px 32px;border-radius:12px;margin-bottom:28px}
@@ -46,7 +72,7 @@ td{padding:9px 10px;border-bottom:1px solid #f0f0f8}
 ul{padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6;margin-bottom:20px}
 .footer{text-align:center;font-size:11px;color:#aaa;border-top:1px solid #f0f0f8;padding-top:18px;margin-top:28px}
 </style></head><body>
-<div class="header"><h1>📊 Informe Diario — CONVERSIA ADS</h1><p>Generado el ${date} a las 20:00 hs</p></div>
+<div class="header"><h1>📊 Informe CONVERSIA ADS — ${date}</h1><p>Generado automáticamente a las 20:00 hs</p></div>
 <div class="kpis">
   <div class="kpi"><div class="kpi-lbl">ROAS Promedio</div><div class="kpi-val green">3.8x</div></div>
   <div class="kpi"><div class="kpi-lbl">Leads WhatsApp</div><div class="kpi-val purple">342</div></div>
@@ -54,31 +80,34 @@ ul{padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px;l
   <div class="kpi"><div class="kpi-lbl">Gasto Total</div><div class="kpi-val amber">$1,358</div></div>
 </div>
 <h2>📣 Detalle de campañas</h2>
-<table><thead><tr><th>Campaña</th><th>ROAS</th><th>CTR</th><th>Gasto</th><th>Leads</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>Campaña</th><th>ROAS</th><th>CTR</th><th>Gasto</th><th>Leads</th></tr></thead><tbody>${rowsHtml}</tbody></table>
 ${insightSection}
 <div class="footer">CONVERSIA ADS · Informe automático · ${date}</div>
 </body></html>`;
   const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = `informe-${date.replace(/\//g, '-')}.html`;
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `informe-${date.replace(/\//g, '-')}.html`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
+/* ── Component ──────────────────────────────────────────────────────────────── */
+
 export default function Reports() {
-  const [downloading, setDownloading] = useState(false);
-  const [generatingReport, setGeneratingReport] = useState(false);
+  const [downloading,        setDownloading]        = useState(false);
+  const [generatingReport,   setGeneratingReport]   = useState(false);
   const [generatingInsights, setGeneratingInsights] = useState(false);
-  const [reports, setReports] = useState<ReportRow[]>([]);
-  const [aiInsights, setAiInsights] = useState<any[]>([]);
-  const [loadingReports, setLoadingReports] = useState(true);
-  const [toast, setToast] = useState('');
+  const [reports,            setReports]            = useState<ReportRow[]>([]);
+  const [aiInsights,         setAiInsights]         = useState<any[]>([]);
+  const [loadingReports,     setLoadingReports]     = useState(true);
+  const [toast,              setToast]              = useState('');
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 3500); };
 
   const loadReports = useCallback(async () => {
     setLoadingReports(true);
     try {
-      const res = await reportsApi.getAll();
+      const res  = await reportsApi.getAll();
       const list = (res.data as any)?.data?.reports ?? (res.data as any)?.reports ?? [];
       if (Array.isArray(list)) setReports(list);
     } catch { /* keep empty */ }
@@ -97,9 +126,9 @@ export default function Reports() {
     try {
       await reportsApi.generate();
       await loadReports();
-      showToast('✅ Informe generado correctamente');
+      showToast('Informe generado correctamente');
     } catch {
-      showToast('⚠️ Sin datos de campaña para generar informe');
+      showToast('Sin datos de campaña para generar informe');
     }
     setGeneratingReport(false);
   };
@@ -107,39 +136,28 @@ export default function Reports() {
   const handleGenerateInsights = async () => {
     setGeneratingInsights(true);
     try {
-      const res = await api.post('/ai/insights', { campaigns: MOCK_CAMPAIGNS });
+      const res  = await api.post('/ai/insights', { campaigns: MOCK_CAMPAIGNS });
       const data = (res.data as any)?.data ?? res.data;
-      if (Array.isArray(data) && data.length > 0) {
-        setAiInsights(data);
-        showToast('🤖 Insights de IA generados');
-      }
+      if (Array.isArray(data) && data.length > 0) { setAiInsights(data); showToast('Insights de IA generados'); }
     } catch {
-      showToast('⚠️ IA no disponible — configurá ANTHROPIC_API_KEY en Railway');
+      showToast('IA no disponible — configurá ANTHROPIC_API_KEY en Railway');
     }
     setGeneratingInsights(false);
   };
 
-  const latestReport = reports[0];
+  const latestReport   = reports[0];
   const latestInsights = latestReport?.insights ?? [];
 
-  const displayInsights: { i: string; t: string; x: 'tg' | 'ta' | 'tb' | 'tr' }[] =
+  const displayInsights: { i: string; t: string; detail?: string; x: 'tg'|'ta'|'tb'|'tr' }[] =
     aiInsights.length > 0
-      ? aiInsights.map(ins => ({
-          i: INSIGHT_TYPE_ICON[ins.type] ?? '💡',
-          t: `${ins.title}: ${ins.detail}`,
-          x: INSIGHT_TYPE_TAG[ins.type] ?? 'tb',
-        }))
+      ? aiInsights.map(ins => ({ i: INSIGHT_TYPE_ICON[ins.type] ?? '💡', t: ins.title, detail: ins.detail, x: INSIGHT_TYPE_TAG[ins.type] ?? 'tb' }))
       : latestInsights.length > 0
-      ? latestInsights.map((ins: any) => ({
-          i: INSIGHT_TYPE_ICON[ins.type] ?? '💡',
-          t: `${ins.title}: ${ins.detail ?? ins.action}`,
-          x: INSIGHT_TYPE_TAG[ins.type] ?? 'tb',
-        }))
+      ? latestInsights.map((ins: any) => ({ i: INSIGHT_TYPE_ICON[ins.type] ?? '💡', t: ins.title, detail: ins.detail ?? ins.action, x: INSIGHT_TYPE_TAG[ins.type] ?? 'tb' }))
       : [
-          { i: '✅', t: 'Gaming Carrusel: ROAS 5.8x → subir presupuesto', x: 'tg' as const },
-          { i: '⚠️', t: 'Ropa Invierno: CTR 1.9% → reformular hook', x: 'ta' as const },
-          { i: '🚀', t: 'Reels generan 60% más leads que carruseles', x: 'tb' as const },
-          { i: '💬', t: '342 leads WA esta semana (+28%)', x: 'tg' as const },
+          { i: '✅', t: 'Gaming Carrusel ROAS 5.8x',        detail: 'Subir presupuesto a $60/día',         x: 'tg' as const },
+          { i: '⚠️', t: 'Ropa Invierno CTR 1.9%',           detail: 'Reformular hook o pausar campaña',    x: 'ta' as const },
+          { i: '🚀', t: 'Reels generan 60% más leads',       detail: 'vs carruseles en el mismo período',   x: 'tb' as const },
+          { i: '💬', t: '342 leads WA esta semana',           detail: '+28% vs semana anterior',             x: 'tg' as const },
         ];
 
   const campaignRows = latestReport?.summary
@@ -150,108 +168,243 @@ export default function Reports() {
       }))
     : MOCK_CAMPAIGNS;
 
-  return (
-    <div className="content fade-in">
-      {toast && (
-        <div style={{ position: 'fixed', top: 16, right: 16, background: C.green, color: '#fff', padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 500, zIndex: 999, boxShadow: '0 4px 20px #0006' }}>{toast}</div>
-      )}
+  const fadeUp = (delay = 0) => ({
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: .25, delay },
+  });
 
-      <div className="g4" style={{ marginBottom: 18 }}>
+  return (
+    <div className="content">
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: .2 }}
+            className="fixed top-4 right-4 z-[999] bg-surface border border-border rounded-xl px-4 py-3 text-[13px] text-text flex items-center gap-2.5"
+            style={{ boxShadow: '0 8px 32px #00000066' }}
+          >
+            <span className="w-2 h-2 rounded-full bg-green flex-shrink-0" />
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <motion.div {...fadeUp(0)} className="flex items-end justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h2 className="font-syne font-extrabold text-[22px] text-text leading-tight mb-1">Reportes & Analytics</h2>
+          <p className="text-[13px] text-muted">
+            {loadingReports ? 'Cargando...' : latestReport
+              ? `Último informe: ${new Date(latestReport.created_at).toLocaleDateString('es-AR')}`
+              : 'Resumen de rendimiento de campañas'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-g flex items-center gap-1.5" style={{ fontSize: 12 }}
+            onClick={handleGenerateInsights} disabled={generatingInsights}>
+            {generatingInsights ? <Spinner size={12} /> : <Brain size={13} />}
+            Insights IA
+          </button>
+          <button className="btn btn-g flex items-center gap-1.5" style={{ fontSize: 12 }}
+            onClick={handleGenerateReport} disabled={generatingReport}>
+            {generatingReport ? <Spinner size={12} /> : <Zap size={13} />}
+            Generar
+          </button>
+          <button className="btn btn-p flex items-center gap-1.5" style={{ fontSize: 12 }}
+            onClick={handlePDF} disabled={downloading}>
+            {downloading ? <Spinner size={12} /> : <Download size={13} />}
+            Descargar PDF
+          </button>
+        </div>
+      </motion.div>
+
+      {/* ── KPI strip ───────────────────────────────────────────────────────── */}
+      <div className="g4 mb-5">
         {[
-          { label: 'ROAS promedio', value: latestReport ? `${(latestReport.summary.avgRoas ?? 3.8).toFixed(1)}x` : '3.8x', change: '+0.4x esta semana', up: true, chart: [2, 2.5, 3, 2.8, 3.5, 3.3, 3.8], color: C.green },
-          { label: 'CPM promedio', value: '$4.20', change: '-$0.80 vs ant.', up: true, chart: [7, 6.5, 6, 5.5, 5, 4.8, 4.2], color: C.blue },
-          { label: 'Leads totales', value: latestReport ? String(latestReport.summary.totalLeads ?? 342) : '342', change: '+5% vs mes ant.', up: true, chart: [12, 14, 17, 19, 20, 21, 23], color: C.accent },
-          { label: 'Costo / lead', value: '$1.80', change: '-$0.40 vs mes ant.', up: true, chart: [3.5, 3, 2.8, 2.4, 2.2, 2, 1.8], color: C.amber },
-        ].map(m => (
-          <div key={m.label} className="card card-sm fade-in">
-            <div className="m-lbl">{m.label}</div>
-            <div className="m-val" style={{ color: m.color }}>{m.value}</div>
-            <div className={`m-chg ${m.up ? 'up' : 'down'}`}><span>▲</span> {m.change}</div>
-            <MiniChart data={m.chart} color={m.color} />
-          </div>
-        ))}
+          { label: 'ROAS promedio',  value: latestReport ? `${(latestReport.summary.avgRoas ?? 3.8).toFixed(1)}x` : '3.8x', change: '+0.4x esta semana',   icon: TrendingUp,   color: '#00d68f' },
+          { label: 'CPM promedio',   value: '$4.20',  change: '-$0.80 vs anterior',     icon: TrendingDown, color: '#4da6ff' },
+          { label: 'Leads totales',  value: latestReport ? String(latestReport.summary.totalLeads ?? 342) : '342', change: '+5% vs mes ant.', icon: Users, color: '#7c5cfc' },
+          { label: 'Costo / lead',   value: '$1.80',  change: '-$0.40 vs mes ant.',     icon: DollarSign,   color: '#ffb347' },
+        ].map((k, i) => {
+          const Icon = k.icon;
+          return (
+            <motion.div key={k.label} {...fadeUp(i * .06)} className="card" style={{ padding: '14px 16px' }}>
+              <div className="flex items-start justify-between mb-2">
+                <span className="text-[10px] text-muted font-mono uppercase tracking-wider">{k.label}</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: k.color + '1a' }}>
+                  <Icon size={14} style={{ color: k.color }} />
+                </div>
+              </div>
+              <div className="font-syne font-bold text-[26px] leading-none mb-1" style={{ color: k.color }}>{k.value}</div>
+              <div className="text-[11px]" style={{ color: '#00d68f' }}>▲ {k.change}</div>
+            </motion.div>
+          );
+        })}
       </div>
 
-      <div className="g2" style={{ gap: 16 }}>
-        <div className="card">
-          <div className="sh">
+      {/* ── Charts row ──────────────────────────────────────────────────────── */}
+      <div className="g2 mb-5">
+
+        {/* ROAS + Leads area chart */}
+        <motion.div {...fadeUp(.15)} className="card" style={{ padding: 18 }}>
+          <div className="sh mb-4">
             <div>
-              <div className="sh-title">
-                {latestReport ? `Informe — ${new Date(latestReport.created_at).toLocaleDateString('es-AR')}` : 'Informe diario — 20:00'}
-              </div>
-              <div className="sh-sub">
-                {loadingReports ? 'Cargando...' : latestReport ? `Campañas: ${latestReport.summary.totalCampaigns} · Leads: ${latestReport.summary.totalLeads}` : 'Generado automáticamente por IA'}
-              </div>
+              <div className="sh-title">ROAS semanal</div>
+              <div className="sh-sub">Evolución últimos 7 días</div>
             </div>
-            <div style={{ display: 'flex', gap: 7 }}>
-              <button className="btn btn-g" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}
-                onClick={handleGenerateInsights} disabled={generatingInsights}>
-                {generatingInsights ? <><Spinner size={12} />Analizando...</> : '🤖 Insights IA'}
-              </button>
-              <button className="btn btn-g" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}
-                onClick={handlePDF} disabled={downloading}>
-                {downloading ? <><Spinner size={12} />Generando...</> : '📥 PDF'}
-              </button>
+            <Tag t="tg">+14% semana</Tag>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={WEEKLY_DATA} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+              <defs>
+                <linearGradient id="grad-roas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#00d68f" stopOpacity={.25} />
+                  <stop offset="100%" stopColor="#00d68f" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1c1c2e" vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: '#666688', fontSize: 10, fontFamily: "'DM Mono',monospace" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#666688', fontSize: 10, fontFamily: "'DM Mono',monospace" }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: '#272740' }} />
+              <Area type="monotone" dataKey="roas" stroke="#00d68f" strokeWidth={2} fill="url(#grad-roas)" dot={false} name="ROAS" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Leads bar chart */}
+        <motion.div {...fadeUp(.2)} className="card" style={{ padding: 18 }}>
+          <div className="sh mb-4">
+            <div>
+              <div className="sh-title">Leads por día</div>
+              <div className="sh-sub">WhatsApp + formularios</div>
+            </div>
+            <Tag t="tp">342 total</Tag>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={WEEKLY_DATA} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1c1c2e" vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: '#666688', fontSize: 10, fontFamily: "'DM Mono',monospace" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#666688', fontSize: 10, fontFamily: "'DM Mono',monospace" }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#1c1c2e' }} />
+              <Bar dataKey="leads" fill="#7c5cfc" radius={[4, 4, 0, 0]} name="Leads" />
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+      </div>
+
+      {/* ── Campaign performance + Insights ─────────────────────────────────── */}
+      <div className="g2 mb-5">
+
+        {/* Campaign performance */}
+        <motion.div {...fadeUp(.25)} className="card" style={{ padding: 18 }}>
+          <div className="sh mb-4">
+            <div>
+              <div className="sh-title flex items-center gap-2">
+                <BarChart3 size={14} className="text-muted" />
+                Rendimiento por campaña
+              </div>
+              <div className="sh-sub">ROAS vs objetivo (3x mínimo)</div>
             </div>
           </div>
-
-          {loadingReports ? (
-            <div style={{ textAlign: 'center', padding: '30px 0' }}><Spinner size={20} /></div>
-          ) : (
-            displayInsights.map((ins, i) => (
-              <div key={i} className="insight">
-                <span style={{ fontSize: 15 }}>{ins.i}</span>
-                <div style={{ flex: 1, fontSize: 12, lineHeight: 1.5 }}>{ins.t}</div>
-                <Tag t={ins.x}>{ins.x === 'tg' ? 'Bien' : ins.x === 'ta' ? 'Atención' : ins.x === 'tr' ? 'Pausar' : 'Info'}</Tag>
-              </div>
-            ))
-          )}
-
-          <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ flex: 1, padding: '10px 12px', background: C.greenDim, border: `1px solid ${C.green}33`, borderRadius: 8, fontSize: 12, color: C.green }}>
-              ✅ Próximo informe: hoy a las 20:00 hs
-            </div>
-            <button className="btn btn-g" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}
-              onClick={handleGenerateReport} disabled={generatingReport}>
-              {generatingReport ? <><Spinner size={12} />Generando...</> : '⚡ Generar ahora'}
-            </button>
+          <div className="flex flex-col gap-3.5">
+            {campaignRows.map(c => {
+              const roas  = parseFloat(c.roas);
+              const pct   = Math.min(100, roas / 6 * 100);
+              const color = roas >= 3 ? '#00d68f' : roas >= 2 ? '#ffb347' : '#ff4d6a';
+              return (
+                <div key={c.id}>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[12px] font-medium text-text truncate pr-2">{c.name}</span>
+                    <span className="font-mono text-[12px] font-semibold flex-shrink-0" style={{ color }}>{c.roas}</span>
+                  </div>
+                  <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                      transition={{ duration: .6, delay: .3 }}
+                      className="h-full rounded-full"
+                      style={{ background: color }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1 text-[10px] text-muted font-mono">
+                    <span>{c.leads} leads</span>
+                    <span>CTR {c.ctr}</span>
+                    <span>{c.spent}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
-
-        <div className="card">
-          <div className="sh-title" style={{ marginBottom: 13 }}>Rendimiento por campaña</div>
-          {campaignRows.map(c => (
-            <div key={c.id} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-                <span style={{ fontWeight: 500 }}>{c.name}</span>
-                <span style={{ color: C.green, fontFamily: "'DM Mono',monospace" }}>{c.roas}</span>
-              </div>
-              <div className="prog-wrap">
-                <div className="prog-bar" style={{ width: `${Math.min(100, parseFloat(c.roas) / 6 * 100)}%`, background: parseFloat(c.roas) >= 3 ? C.green : parseFloat(c.roas) >= 2 ? C.amber : C.red }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, fontSize: 10, color: C.textMuted, fontFamily: "'DM Mono',monospace" }}>
-                <span>{c.leads} leads</span><span>CTR {c.ctr}</span><span>{c.spent}</span>
-              </div>
-            </div>
-          ))}
 
           {reports.length > 0 && (
-            <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}22`, paddingTop: 12 }}>
-              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8, fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: '.05em' }}>Historial de informes</div>
-              {reports.slice(0, 5).map(r => (
-                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${C.border}11`, fontSize: 12 }}>
-                  <span>{new Date(r.period_start).toLocaleDateString('es-AR')} — {r.type}</span>
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="text-[10px] text-muted font-mono uppercase tracking-wider mb-2.5">Historial de informes</div>
+              {reports.slice(0, 4).map(r => (
+                <div key={r.id} className="flex justify-between items-center py-1.5 border-b border-border/20 text-[12px]">
+                  <span className="text-text">{new Date(r.period_start).toLocaleDateString('es-AR')} — {r.type}</span>
                   <Tag t="tb">{r.summary.totalLeads} leads</Tag>
                 </div>
               ))}
             </div>
           )}
+        </motion.div>
 
-          <button className="btn btn-g" style={{ width: '100%', marginTop: 12, fontSize: 12 }} onClick={handlePDF}>
-            📥 Descargar informe completo
-          </button>
-        </div>
+        {/* AI Insights */}
+        <motion.div {...fadeUp(.3)} className="card" style={{ padding: 18 }}>
+          <div className="sh mb-4">
+            <div>
+              <div className="sh-title flex items-center gap-2">
+                Insights IA
+                <div className="ai-dots"><div className="ai-dot" /><div className="ai-dot" /><div className="ai-dot" /></div>
+              </div>
+              <div className="sh-sub">Recomendaciones generadas por Claude</div>
+            </div>
+            <button
+              onClick={handleGenerateInsights} disabled={generatingInsights}
+              className="flex items-center gap-1.5 text-[11px] text-accent hover:opacity-80 transition-opacity font-mono disabled:opacity-50"
+            >
+              <RefreshCw size={11} className={generatingInsights ? 'animate-spin' : ''} />
+              Actualizar
+            </button>
+          </div>
+
+          {generatingInsights ? (
+            <div className="flex justify-center py-8"><Spinner size={20} /></div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {displayInsights.map((ins, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-xl hover:bg-surface2 transition-colors cursor-pointer group">
+                  <span className="text-[16px] flex-shrink-0 mt-0.5">{ins.i}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-medium text-text">{ins.t}</div>
+                    {ins.detail && <div className="text-[11px] text-muted mt-0.5">{ins.detail}</div>}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Tag t={ins.x}>{ins.x === 'tg' ? 'Bien' : ins.x === 'ta' ? 'Atención' : ins.x === 'tr' ? 'Pausar' : 'Info'}</Tag>
+                    <ChevronRight size={12} className="text-dim group-hover:text-muted transition-colors" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 p-3 bg-green/10 border border-green/20 rounded-xl flex items-center justify-between">
+            <div className="text-[12px] text-green flex items-center gap-2">
+              <Zap size={12} />
+              Próximo informe hoy a las 20:00 hs
+            </div>
+            <button
+              className="text-[11px] text-green hover:opacity-80 font-mono transition-opacity"
+              onClick={handleGenerateReport} disabled={generatingReport}
+            >
+              {generatingReport ? <Spinner size={10} /> : 'Generar ahora →'}
+            </button>
+          </div>
+        </motion.div>
       </div>
+
     </div>
   );
 }

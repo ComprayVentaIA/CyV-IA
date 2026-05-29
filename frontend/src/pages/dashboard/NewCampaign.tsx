@@ -76,7 +76,7 @@ export default function NewCampaign() {
     const style = strategy.styleNotes ?? 'Hook urgencia';
 
     // productPhotoUrl is set explicitly in goToCreatives() — no stale closure issue
-    const uploadedPhotoUrl = productPhotoUrl;
+    void productPhotoUrl;
 
     setGeneratingImages(true);
     setFluxError('');
@@ -379,8 +379,8 @@ export default function NewCampaign() {
           {(() => {
             // Read photo directly from file state — always up-to-date, no closure issues
             const photoUrl = extraFiles[0]?.preview || mainFiles[0]?.preview || null;
-            const hook = strategy?.hook || form.name || 'Oferta especial';
-            const product = form.name || 'Producto';
+            void strategy?.hook;
+            void form.name;
 
             return (
               <div>
